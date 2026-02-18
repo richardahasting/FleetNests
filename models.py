@@ -188,6 +188,9 @@ def validate_reservation(user_id: int, start_dt: datetime, end_dt: datetime) -> 
     if start_dt < now_ct():
         return "Start time cannot be in the past."
 
+    if start_dt.date() > date.today() + timedelta(days=60):
+        return "Reservations cannot be made more than 60 days in advance."
+
     if start_dt.date() != end_dt.date():
         return "Reservations must start and end on the same calendar day."
 
