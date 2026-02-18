@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Login — Bentley Boat Club{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-12 col-sm-8 col-md-5 col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <div class="text-center mb-4">
+          <i class="bi bi-water text-club-blue" style="font-size:2.5rem"></i>
+          <h4 class="mt-2 fw-bold">Bentley Boat Club</h4>
+          <p class="text-muted small">Member reservation system</p>
+        </div>
+
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label" for="username">Username</label>
+            <input type="text" class="form-control" id="username" name="username"
+                   autocomplete="username" autofocus required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="password">Password</label>
+            <input type="password" class="form-control" id="password" name="password"
+                   autocomplete="current-password" required>
+          </div>
+          <button type="submit" class="btn btn-club-blue w-100">
+            <i class="bi bi-box-arrow-in-right me-1"></i>Log In
+          </button>
+        </form>
+
+        <p class="text-center text-muted small mt-3 mb-0">
+          Don't have an account? Ask the club administrator.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

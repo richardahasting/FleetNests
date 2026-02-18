@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bentley_user
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: bentley_boat
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on: [db]
+    ports:
+      - "5210:5210"
+    environment:
+      DATABASE_URL: postgresql://bentley_user:changeme@db/bentley_boat
+      SECRET_KEY: change-me-in-production
+      APP_PREFIX: /
+
+volumes:
+  postgres_data:

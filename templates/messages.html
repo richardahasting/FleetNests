@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Messages — Bentley Boat Club{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="fw-bold mb-0"><i class="bi bi-chat-square-text me-2 text-club-blue"></i>Message Board</h5>
+  <a href="{{ url_for('new_message') }}" class="btn btn-sm btn-club-blue">
+    <i class="bi bi-plus-lg me-1"></i>Post Message
+  </a>
+</div>
+
+{% if messages %}
+  {% for msg in messages %}
+    <div class="card border-0 shadow-sm mb-3 {% if msg.is_announcement %}border-start border-4 border-warning{% endif %}">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            {% if msg.is_announcement %}
+              <span class="badge bg-warning text-dark me-1"><i class="bi bi-megaphone me-1"></i>Announcement</span>
+            {% endif %}
+            <h6 class="card-title d-inline fw-semibold">{{ msg.title }}</h6>
+          </div>
+          {% if msg.user_id == current_user.id or current_user.is_admin %}
+            <form method="post" action="{{ url_for('delete_message', msg_id=msg.id) }}" class="ms-2">
+              <button type="submit" class="btn btn-sm btn-outline-danger"
+                      onclick="return confirm('Delete this message?')">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          {% endif %}
+        </div>
+        <p class="card-text mt-2 mb-1" style="white-space:pre-wrap">{{ msg.body }}</p>
+        <small class="text-muted">
+          {{ msg.full_name }} · {{ msg.created_at.strftime('%b %d, %Y %I:%M %p') }}
+        </small>
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="text-center text-muted py-5">
+    <i class="bi bi-chat-square-text" style="font-size:2rem"></i>
+    <p class="mt-2">No messages yet. Be the first to post!</p>
+  </div>
+{% endif %}
+{% endblock %}

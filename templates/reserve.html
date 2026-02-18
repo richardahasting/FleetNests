@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}{{ day.strftime('%B %d, %Y') }} — Bentley Boat Club{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-7 col-lg-6">
+
+    <div class="d-flex align-items-center mb-3">
+      <a href="{{ url_for('calendar') }}" class="btn btn-sm btn-outline-secondary me-3">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <h5 class="mb-0 fw-bold">{{ day.strftime('%A, %B %d, %Y') }}</h5>
+    </div>
+
+    {# ---- Existing reservations for this day ---- #}
+    {% if existing %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light fw-semibold small text-muted">
+        <i class="bi bi-clock me-1"></i>Already reserved today
+      </div>
+      <ul class="list-group list-group-flush">
+        {% for res in existing %}
+        <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+          <div>
+            <div class="res-avatar-sm d-inline-flex me-2">{{ res.full_name[0] }}</div>
+            <strong>{{ res.full_name }}</strong>
+            <span class="text-muted ms-2">
+              {{ res.start_time.strftime('%-I:%M %p') }} – {{ res.end_time.strftime('%-I:%M %p') }} CT
+            </span>
+          </div>
+          {% if res.user_id == current_user.id or current_user.is_admin %}
+          <form method="post" action="{{ url_for('cancel_reservation', res_id=res.id) }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger"
+                    onclick="return confirm('Cancel this reservation?')">
+              <i class="bi bi-x-circle"></i>
+            </button>
+          </form>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {# ---- Reserve form ---- #}
+    {% if day < today %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="alert alert-secondary mb-0">
+          <i class="bi bi-calendar-x me-1"></i>This date is in the past.
+        </div>
+      </div>
+    </div>
+
+    {% else %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <h6 class="fw-semibold mb-3"><i class="bi bi-plus-circle me-1 text-club-blue"></i>Make a Reservation</h6>
+        <p class="text-muted small mb-3">
+          Minimum <strong>4 hours</strong>, maximum <strong>12 hours</strong>.
+          Max 3 consecutive days · Max 7 upcoming reservations total.
+        </p>
+
+        <form method="post" id="reserveForm">
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label" for="start_time">Start Time</label>
+              <input type="time" class="form-control" id="start_time" name="start_time"
+                     step="1800" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label" for="end_time">End Time</label>
+              <input type="time" class="form-control" id="end_time" name="end_time"
+                     step="1800" required>
+            </div>
+          </div>
+
+          {# Live duration feedback #}
+          <div id="durationHint" class="form-text mt-2"></div>
+
+          <button type="submit" class="btn btn-club-blue mt-3 w-100" id="submitBtn">
+            <i class="bi bi-check-lg me-1"></i>Reserve
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const startEl = document.getElementById('start_time');
+  const endEl   = document.getElementById('end_time');
+  const hint    = document.getElementById('durationHint');
+  const btn     = document.getElementById('submitBtn');
+  if (!startEl) return;
+
+  function update() {
+    if (!startEl.value || !endEl.value) { hint.textContent = ''; return; }
+    const [sh, sm] = startEl.value.split(':').map(Number);
+    const [eh, em] = endEl.value.split(':').map(Number);
+    const mins = (eh * 60 + em) - (sh * 60 + sm);
+    const hrs  = mins / 60;
+
+    if (mins <= 0) {
+      hint.className = 'form-text text-danger';
+      hint.textContent = 'End time must be after start time.';
+      btn.disabled = true;
+    } else if (hrs < 4) {
+      hint.className = 'form-text text-danger';
+      hint.textContent = `${hrs.toFixed(1)}h — minimum is 4 hours.`;
+      btn.disabled = true;
+    } else if (hrs > 12) {
+      hint.className = 'form-text text-danger';
+      hint.textContent = `${hrs.toFixed(1)}h — maximum is 12 hours.`;
+      btn.disabled = true;
+    } else {
+      hint.className = 'form-text text-success';
+      hint.textContent = `${hrs % 1 === 0 ? hrs : hrs.toFixed(1)} hours — looks good!`;
+      btn.disabled = false;
+    }
+  }
+
+  startEl.addEventListener('change', update);
+  endEl.addEventListener('change', update);
+})();
+</script>
+{% endblock %}

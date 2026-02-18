@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+gunicorn.ctl
+runme.sh
+runme.complete

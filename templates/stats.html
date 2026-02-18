@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Stats — Bentley Boat Club{% endblock %}
+
+{% block content %}
+<h5 class="fw-bold mb-3"><i class="bi bi-bar-chart me-2 text-club-blue"></i>Usage Statistics</h5>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Member</th>
+          <th class="text-center">Upcoming</th>
+          <th class="text-center">Past</th>
+          <th class="text-center">Total Active</th>
+          <th class="text-center">Cancelled</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            <div class="res-avatar-sm me-2 d-inline-flex">{{ row.full_name[0] }}</div>
+            {{ row.full_name }}
+          </td>
+          <td class="text-center">
+            {% if row.upcoming %}
+              <span class="badge bg-club-blue">{{ row.upcoming }}</span>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td class="text-center text-muted">{{ row.past or '—' }}</td>
+          <td class="text-center fw-semibold">{{ row.total or '—' }}</td>
+          <td class="text-center text-muted">{{ row.cancelled or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="text-center text-muted py-4">No reservations yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

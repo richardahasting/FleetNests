@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Post Message — Bentley Boat Club{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-7 col-lg-6">
+    <div class="d-flex align-items-center mb-3">
+      <a href="{{ url_for('messages') }}" class="btn btn-sm btn-outline-secondary me-3">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <h5 class="mb-0 fw-bold">Post a Message</h5>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label" for="title">Title</label>
+            <input type="text" class="form-control" id="title" name="title"
+                   maxlength="200" required autofocus>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="body">Message</label>
+            <textarea class="form-control" id="body" name="body"
+                      rows="6" required></textarea>
+          </div>
+          {% if current_user.is_admin %}
+          <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" id="is_announcement" name="is_announcement">
+            <label class="form-check-label" for="is_announcement">
+              <i class="bi bi-megaphone me-1"></i>Pin as Announcement
+            </label>
+          </div>
+          {% endif %}
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-club-blue">
+              <i class="bi bi-send me-1"></i>Post
+            </button>
+            <a href="{{ url_for('messages') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
