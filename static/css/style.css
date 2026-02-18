@@ -1,59 +1,306 @@
-/* Bentley Boat Club — minimal Bootstrap 5 overrides */
+/* ============================================================
+   Bentley Boat Club — Nautical Design System
+   Palette: Deep Navy · Brass Gold · Warm Sand · White
+   ============================================================ */
 
+/* ── Design tokens ── */
 :root {
-  --club-blue: #0d6efd;
-  --club-blue-dark: #0b5ed7;
+  --navy:       #0A2342;
+  --navy-dark:  #061829;
+  --navy-mid:   #163360;
+  --navy-light: #1e4a80;
+  --gold:       #C9A84C;
+  --gold-dark:  #A88430;
+  --gold-light: #ECD98A;
+  --seafoam:    #3D8B85;
+  --sand:       #F4F0E8;
+  --sand-dark:  #EBE5D8;
+  --rope:       #8B6914;
+
+  /* Legacy aliases — keep all existing class names working */
+  --club-blue:      var(--navy);
+  --club-blue-dark: var(--navy-dark);
 }
 
-/* Navbar */
-.bg-club-blue  { background-color: var(--club-blue) !important; }
+/* ── Base ── */
+body {
+  background-color: var(--sand);
+  color: #1a1a2e;
+}
+
+/* ── Typography ── */
+.navbar-brand,
+h1, h2, h3, h4, h5, h6,
+.fw-bold,
+.card-header,
+.fc .fc-toolbar-title {
+  font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+}
+
+/* ── Navbar ── */
+.bg-club-blue,
+.navbar.bg-club-blue {
+  background: linear-gradient(160deg, var(--navy-dark) 0%, var(--navy) 100%) !important;
+  border-bottom: 2px solid var(--gold);
+  box-shadow: 0 2px 12px rgba(10, 35, 66, 0.35);
+}
+
+.navbar-brand {
+  color: var(--gold) !important;
+  font-size: 1.05rem;
+  letter-spacing: 0.03em;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  transition: color 0.15s;
+}
+.navbar-brand:hover { color: var(--gold-light) !important; }
+
+.navbar-brand .brand-badge {
+  height: 34px;
+  width: auto;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
+}
+
+.navbar-dark .navbar-nav .nav-link {
+  color: rgba(255, 255, 255, 0.80);
+  font-size: 0.875rem;
+  letter-spacing: 0.01em;
+  transition: color 0.15s;
+}
+.navbar-dark .navbar-nav .nav-link:hover,
+.navbar-dark .navbar-nav .nav-link.active {
+  color: var(--gold) !important;
+}
+
+.navbar .dropdown-menu {
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  box-shadow: 0 10px 28px rgba(10, 35, 66, 0.22);
+  border-radius: 0.6rem;
+  overflow: hidden;
+}
+.navbar .dropdown-item:hover {
+  background-color: var(--sand);
+  color: var(--navy);
+}
+
+/* ── Buttons ── */
 .btn-club-blue {
-  background-color: var(--club-blue);
-  border-color: var(--club-blue);
+  background-color: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+  letter-spacing: 0.02em;
+  transition: all 0.2s;
+}
+.btn-club-blue:hover,
+.btn-club-blue:focus {
+  background-color: var(--navy-mid);
+  border-color: var(--navy-mid);
+  color: var(--gold-light);
+  box-shadow: 0 0 0 0.2rem rgba(201, 168, 76, 0.28);
+}
+.btn-outline-club-blue {
+  border-color: var(--navy);
+  color: var(--navy);
+}
+.btn-outline-club-blue:hover {
+  background-color: var(--navy);
   color: #fff;
 }
-.btn-club-blue:hover {
-  background-color: var(--club-blue-dark);
-  border-color: var(--club-blue-dark);
+.btn-gold {
+  background-color: var(--gold);
+  border-color: var(--gold-dark);
+  color: var(--navy);
+  font-weight: 600;
+}
+.btn-gold:hover {
+  background-color: var(--gold-dark);
+  border-color: var(--gold-dark);
   color: #fff;
 }
-.text-club-blue { color: var(--club-blue) !important; }
 
-/* Avatar circles */
-.res-avatar {
-  width: 48px; height: 48px;
-  border-radius: 50%;
-  background: var(--club-blue);
-  color: #fff;
-  font-size: 1.4rem;
+/* ── Utility classes ── */
+.bg-club-blue    { background-color: var(--navy) !important; }
+.text-club-blue  { color: var(--navy) !important; }
+.text-gold       { color: var(--gold) !important; }
+.bg-sand         { background-color: var(--sand) !important; }
+
+/* ── Cards ── */
+.card {
+  border-radius: 0.8rem !important;
+  border: 1px solid rgba(0, 0, 0, 0.07) !important;
+  background-color: #ffffff;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.card:hover {
+  box-shadow: 0 6px 24px rgba(10, 35, 66, 0.13) !important;
+  transform: translateY(-1px);
+}
+
+.card-header {
+  border-bottom: 1px solid rgba(201, 168, 76, 0.2);
+  font-size: 0.88rem;
+  letter-spacing: 0.01em;
+}
+.card-header.bg-club-blue {
+  background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy) 100%) !important;
+  color: var(--gold-light);
+  border-bottom: none;
+}
+.card-header.bg-light {
+  background-color: var(--sand) !important;
+  color: var(--navy);
+}
+
+/* ── Tables ── */
+.table-light th,
+thead.table-light th {
+  background-color: var(--sand) !important;
+  color: var(--navy);
+  font-size: 0.72rem;
   font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: system-ui, -apple-system, sans-serif;
+  border-bottom: 2px solid rgba(201, 168, 76, 0.3) !important;
+}
+
+/* ── Badges ── */
+.badge.bg-warning {
+  background-color: var(--gold) !important;
+  color: var(--navy) !important;
+}
+
+/* ── Avatar circles ── */
+.res-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--navy-mid), var(--navy));
+  color: var(--gold-light);
+  font-size: 1.2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  letter-spacing: 0.05em;
+  border: 2px solid rgba(201, 168, 76, 0.4);
 }
 .res-avatar-sm {
-  width: 28px; height: 28px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: var(--club-blue);
-  color: #fff;
-  font-size: 0.85rem;
+  background: linear-gradient(135deg, var(--navy-mid), var(--navy));
+  color: var(--gold-light);
+  font-size: 0.75rem;
   font-weight: 700;
-  align-items: center; justify-content: center;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid rgba(201, 168, 76, 0.35);
 }
 
-/* Calendar legend dots */
+/* ── Calendar legend dots ── */
 .legend-dot {
   display: inline-block;
-  width: 10px; height: 10px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   margin-right: 4px;
   vertical-align: middle;
 }
 
-/* FullCalendar mobile tweaks */
-@media (max-width: 576px) {
-  .fc .fc-toolbar-title { font-size: 1rem; }
-  .fc .fc-button { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
+/* ── FullCalendar overrides ── */
+.fc .fc-toolbar-title {
+  color: var(--navy);
+  font-size: 1.3rem;
 }
 
-/* Cards: subtle lift on hover */
-.card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.10) !important; }
+.fc .fc-button-primary {
+  background-color: var(--navy) !important;
+  border-color: var(--navy-mid) !important;
+  letter-spacing: 0.01em;
+  transition: background 0.15s;
+}
+.fc .fc-button-primary:hover {
+  background-color: var(--navy-mid) !important;
+  border-color: var(--navy-light) !important;
+}
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  background-color: var(--navy-dark) !important;
+  border-color: var(--navy-dark) !important;
+}
+.fc .fc-button-primary:focus {
+  box-shadow: 0 0 0 0.2rem rgba(201, 168, 76, 0.35) !important;
+}
+
+/* Today's date highlight */
+.fc .fc-daygrid-day.fc-day-today {
+  background-color: rgba(201, 168, 76, 0.10) !important;
+}
+.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  background-color: var(--gold);
+  color: var(--navy);
+  border-radius: 50%;
+  font-weight: 700;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 2px;
+}
+
+/* Calendar event pills */
+.fc-event {
+  border-radius: 4px !important;
+  border: none !important;
+  font-size: 0.78rem !important;
+  padding: 1px 4px !important;
+}
+
+/* ── Alerts ── */
+.alert {
+  border-radius: 0.6rem;
+  border-left: 4px solid currentColor;
+}
+
+/* ── Page layout ── */
+main.container-fluid {
+  min-height: calc(100vh - 72px);
+}
+
+/* Section labels (uppercase headers used throughout) */
+h6.text-uppercase.text-muted {
+  color: var(--navy) !important;
+  opacity: 0.55;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+}
+
+/* ── Login page ── */
+.login-brand-badge {
+  height: 80px;
+  width: auto;
+  filter: drop-shadow(0 4px 12px rgba(10, 35, 66, 0.25));
+}
+.login-card {
+  border-top: 4px solid var(--gold) !important;
+}
+
+/* ── Gold divider ── */
+.divider-gold {
+  border: none;
+  border-top: 1px solid rgba(201, 168, 76, 0.3);
+  margin: 1.25rem 0;
+}
+
+/* ── Mobile tweaks ── */
+@media (max-width: 576px) {
+  .fc .fc-toolbar-title { font-size: 1rem; }
+  .fc .fc-button       { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
+  .navbar-brand         { font-size: 0.95rem; }
+  .navbar-brand .brand-badge { height: 28px; }
+}

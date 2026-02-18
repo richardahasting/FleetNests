@@ -4,13 +4,15 @@
 {% block content %}
 <div class="row justify-content-center mt-5">
   <div class="col-12 col-sm-8 col-md-5 col-lg-4">
-    <div class="card shadow-sm">
+    <div class="card shadow-sm login-card">
       <div class="card-body p-4">
         <div class="text-center mb-4">
-          <i class="bi bi-water text-club-blue" style="font-size:2.5rem"></i>
-          <h4 class="mt-2 fw-bold">Bentley Boat Club</h4>
-          <p class="text-muted small">Member reservation system</p>
+          <img src="{{ url_for('static', filename='images/badge.svg') }}"
+               class="login-brand-badge mb-3" alt="Bentley Boat Club">
+          <h4 class="fw-bold mb-1" style="color:var(--navy)">Bentley Boat Club</h4>
+          <p class="text-muted small mb-0">Member Reservation System</p>
         </div>
+        <hr class="divider-gold">
 
         <form method="post">
           <div class="mb-3">
