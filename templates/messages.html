@@ -3,7 +3,13 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h5 class="fw-bold mb-0"><i class="bi bi-chat-square-text me-2 text-club-blue"></i>Message Board</h5>
+  <h5 class="fw-bold mb-0">
+    <i class="bi bi-chat-square-text me-2 text-club-blue"></i>Message Board
+    <a href="{{ url_for('help_page') }}#messages" class="text-muted ms-1"
+       data-bs-toggle="tooltip" title="Help: Posting messages and understanding announcements">
+      <i class="bi bi-question-circle-fill" style="font-size:0.8rem"></i>
+    </a>
+  </h5>
   <a href="{{ url_for('new_message') }}" class="btn btn-sm btn-club-blue">
     <i class="bi bi-plus-lg me-1"></i>Post Message
   </a>

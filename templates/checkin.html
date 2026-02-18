@@ -67,6 +67,10 @@
     <div class="card border-0 shadow-sm mb-4">
       <div class="card-header bg-transparent fw-semibold">
         <i class="bi bi-speedometer2 me-2 text-success"></i>Return Details
+        <a href="{{ url_for('help_page') }}#checkin" class="text-muted ms-1"
+           data-bs-toggle="tooltip" title="Help: Logging return hours, fuel added, and condition notes">
+          <i class="bi bi-question-circle-fill" style="font-size:0.8rem"></i>
+        </a>
       </div>
       <div class="card-body p-4">
         <form method="post" id="checkinForm">

@@ -92,6 +92,13 @@ def register_routes(app: Flask):
         flash("You have been logged out.", "info")
         return redirect(url_for("login"))
 
+    # -- Help ------------------------------------------------------------
+
+    @app.route("/help")
+    @auth.login_required
+    def help_page():
+        return render_template("help.html")
+
     # -- Calendar --------------------------------------------------------
 
     @app.route("/calendar")

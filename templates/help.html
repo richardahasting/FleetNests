@@ -1,0 +1,533 @@
+{% extends "base.html" %}
+{% block title %}Help — Bentley Boat Club{% endblock %}
+
+{% block content %}
+<div class="row">
+
+  {# ---- Sidebar TOC (desktop) ---- #}
+  <div class="col-md-3 d-none d-md-block">
+    <div class="sticky-top" style="top:1.5rem">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-club-blue text-white fw-semibold">
+          <i class="bi bi-journal-text me-2"></i>Help Contents
+        </div>
+        <div class="list-group list-group-flush small">
+          <a class="list-group-item list-group-item-action py-2" href="#member-guide">
+            <i class="bi bi-person me-1 text-club-blue"></i><strong>Member Guide</strong>
+          </a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#getting-started">Getting Started</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#calendar">The Calendar</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#making-reservation">Making a Reservation</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#my-trips">My Trips</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#checkout">Check-Out</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#checkin">Check-In</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#waitlist">Waitlist</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#messages">Message Board</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#profile">Your Profile</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#fuel-log">Fuel Log</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#incidents">Incident Reports</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#ical">Calendar Subscription</a>
+          {% if current_user.is_admin %}
+          <a class="list-group-item list-group-item-action py-2" href="#admin-guide">
+            <i class="bi bi-shield-check me-1 text-club-blue"></i><strong>Admin Guide</strong>
+          </a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#admin-members">Managing Members</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#admin-blackouts">Blackout Dates</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#admin-approvals">Approvals</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#admin-incidents">Incidents</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#admin-fuel">Fuel Statistics</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#admin-trip-logs">Trip Logs</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#admin-audit">Audit Log</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#admin-export">Export CSV</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ---- Main content ---- #}
+  <div class="col-12 col-md-9">
+
+    <div class="d-flex align-items-center mb-4">
+      <a href="{{ url_for('calendar') }}" class="btn btn-sm btn-outline-secondary me-3">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <div>
+        <h4 class="mb-0 fw-bold">
+          <i class="bi bi-question-circle me-2 text-club-blue"></i>Help &amp; Documentation
+        </h4>
+        <div class="text-muted small">Bentley Boat Club Reservation System</div>
+      </div>
+    </div>
+
+    {# ================================================================
+       MEMBER GUIDE
+       ================================================================ #}
+    <h5 class="text-uppercase text-muted fw-semibold small mb-3 mt-2" id="member-guide">
+      <i class="bi bi-person me-1"></i>Member Guide
+    </h5>
+
+    {# --- Getting Started --- #}
+    <div class="card border-0 shadow-sm mb-4" id="getting-started">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-door-open me-2 text-club-blue"></i>Getting Started
+      </div>
+      <div class="card-body p-4">
+        <p>Welcome to the <strong>Bentley Boat Club</strong> reservation system. This web app lets you book the club boat, log trips, report issues, and stay in touch with other members.</p>
+
+        <h6 class="fw-semibold mt-3">Logging In</h6>
+        <p class="mb-2">Sign in with your <strong>username</strong> or <strong>email address</strong> and your password. If you've forgotten your password, contact a club administrator to have it reset.</p>
+
+        <h6 class="fw-semibold mt-3">Navigation</h6>
+        <p class="mb-1">The top navigation bar gives you access to everything:</p>
+        <ul class="mb-0">
+          <li><i class="bi bi-calendar3 me-1 text-club-blue"></i><strong>Calendar</strong> — View availability and book the boat</li>
+          <li><i class="bi bi-bookmark-star me-1 text-club-blue"></i><strong>My Trips</strong> — Manage your reservations and log trips</li>
+          <li><i class="bi bi-bar-chart me-1 text-club-blue"></i><strong>Stats</strong> — See usage statistics for all members</li>
+          <li><i class="bi bi-chat-square-text me-1 text-club-blue"></i><strong>Messages</strong> — Club announcements and member posts</li>
+          <li><i class="bi bi-person-circle me-1 text-club-blue"></i><strong>Your Name</strong> — Access your profile settings and log out</li>
+        </ul>
+      </div>
+    </div>
+
+    {# --- The Calendar --- #}
+    <div class="card border-0 shadow-sm mb-4" id="calendar">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-calendar3 me-2 text-club-blue"></i>The Reservation Calendar
+      </div>
+      <div class="card-body p-4">
+        <p>The calendar shows all reservations for the club boat at a glance. You can switch between <strong>month view</strong> and <strong>list view</strong> using the buttons in the calendar header.</p>
+
+        <h6 class="fw-semibold mt-3">Reading the Calendar</h6>
+        <ul>
+          <li><span class="badge bg-club-blue">&#9679;</span> <strong>Navy events</strong> — Your own reservations</li>
+          <li><span class="badge bg-secondary">&#9679;</span> <strong>Gray events</strong> — Reservations by other members</li>
+          <li><span class="badge bg-danger">&#9679;</span> <strong>Red events</strong> — Blackout dates (boat unavailable)</li>
+        </ul>
+
+        <h6 class="fw-semibold mt-3">Booking from the Calendar</h6>
+        <p class="mb-0">Click any <strong>future date</strong> on the calendar to open the booking page for that day. You can see who has already reserved the boat, check the weather forecast, and make your own reservation.</p>
+      </div>
+    </div>
+
+    {# --- Making a Reservation --- #}
+    <div class="card border-0 shadow-sm mb-4" id="making-reservation">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-plus-circle me-2 text-club-blue"></i>Making a Reservation
+      </div>
+      <div class="card-body p-4">
+        <p>Click a date on the calendar (or navigate to a date directly) to reach the booking form.</p>
+
+        <h6 class="fw-semibold mt-3">Reservation Rules</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered small">
+            <thead class="table-light">
+              <tr><th>Rule</th><th>Details</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Minimum duration</td><td>4 hours</td></tr>
+              <tr><td>Maximum duration</td><td>12 hours</td></tr>
+              <tr><td>Booking window</td><td>Up to 60 days in advance</td></tr>
+              <tr><td>Consecutive days</td><td>Maximum 3 days in a row (default; may vary per member)</td></tr>
+              <tr><td>Pending reservations</td><td>Maximum 7 upcoming reservations at once (default)</td></tr>
+              <tr><td>Overlap</td><td>Reservations cannot overlap with existing bookings or blackout dates</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h6 class="fw-semibold mt-3">Reservation Notes</h6>
+        <p>You can add an optional note (up to 300 characters) to your reservation — for example "fishing trip" or "family outing." Notes are visible to other members on the booking page.</p>
+
+        <h6 class="fw-semibold mt-3">Approval Workflow</h6>
+        <p class="mb-0">Depending on club settings, reservations may require administrator approval before they are confirmed. If approval is required, your reservation will show a <span class="badge bg-warning text-dark">Pending</span> status until an admin approves or denies it. You will be notified by email when a decision is made.</p>
+      </div>
+    </div>
+
+    {# --- My Trips --- #}
+    <div class="card border-0 shadow-sm mb-4" id="my-trips">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-bookmark-star me-2 text-club-blue"></i>My Trips
+      </div>
+      <div class="card-body p-4">
+        <p>The <strong>My Trips</strong> page shows all your upcoming and past reservations in one place.</p>
+
+        <h6 class="fw-semibold mt-3">Upcoming Reservations</h6>
+        <p>Each upcoming trip shows the date, time, duration, and any notes you added. On the day of your reservation, two additional actions appear:</p>
+        <ul>
+          <li><strong>Check Out</strong> <span class="badge bg-club-blue">navy</span> — Complete the departure checklist and record engine hours before leaving the dock.</li>
+          <li><strong>Check In</strong> <span class="badge bg-success">green</span> — Record your return details and fuel added when you get back.</li>
+        </ul>
+
+        <h6 class="fw-semibold mt-3">Cancelling a Reservation</h6>
+        <p>Click the <strong>Cancel</strong> button next to any upcoming reservation. If other members are on the waitlist for that date, they will be automatically notified by email that a slot has opened.</p>
+
+        <h6 class="fw-semibold mt-3">Past &amp; Cancelled Reservations</h6>
+        <p class="mb-0">Past trips are shown below the upcoming section. From here you can also log fuel or report an incident for a completed trip using the icons on the right side of each entry.</p>
+      </div>
+    </div>
+
+    {# --- Check-Out --- #}
+    <div class="card border-0 shadow-sm mb-4" id="checkout">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-box-arrow-right me-2 text-club-blue"></i>Check-Out (Departure)
+      </div>
+      <div class="card-body p-4">
+        <p>Check-out is available on the day of your reservation from <strong>My Trips</strong>. It records the boat's condition before you leave.</p>
+
+        <h6 class="fw-semibold mt-3">Captain's Checklist</h6>
+        <p>A 17-item safety and navigation checklist is grouped into categories. Work through each category before departure. The checklist is <strong>advisory</strong> — check what applies to your trip and submit when ready. The counter shows how many items you've verified.</p>
+
+        <h6 class="fw-semibold mt-3">Departure Details</h6>
+        <ul>
+          <li><strong>Departure Time</strong> — Pre-filled with the current time; adjust if needed.</li>
+          <li><strong>Engine Hours (out)</strong> — Read the engine hour meter and record it here. Optional but recommended for maintenance tracking.</li>
+          <li><strong>Fuel Level</strong> — Select the current fuel level: Empty, ¼, ½, ¾, or Full.</li>
+          <li><strong>Condition Notes</strong> — Note any pre-existing damage or issues you observe before leaving. This protects you if something was already damaged.</li>
+        </ul>
+      </div>
+    </div>
+
+    {# --- Check-In --- #}
+    <div class="card border-0 shadow-sm mb-4" id="checkin">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-box-arrow-in-left me-2 text-success"></i>Check-In (Return)
+      </div>
+      <div class="card-body p-4">
+        <p>After you've completed your trip and returned the boat, use <strong>Check In</strong> from My Trips to close out the trip log.</p>
+
+        <h6 class="fw-semibold mt-3">Return Details</h6>
+        <ul>
+          <li><strong>Return Time</strong> — The time you returned the boat to the dock.</li>
+          <li><strong>Engine Hours (in)</strong> — Record the engine hour meter reading on return. The system will calculate hours used automatically.</li>
+          <li><strong>Fuel Added</strong> — Enter gallons added and total cost. This automatically creates a fuel log entry so the club can track consumption.</li>
+          <li><strong>Condition on Return</strong> — Note any issues or damage discovered during your trip. Submit an <a href="{{ url_for('new_incident') }}">incident report</a> separately for significant damage.</li>
+        </ul>
+
+        <div class="alert alert-info small mb-0">
+          <i class="bi bi-info-circle me-1"></i>
+          If you added fuel during your trip, always log it at check-in — it helps the club track costs and ensures the next boater knows the fuel level.
+        </div>
+      </div>
+    </div>
+
+    {# --- Waitlist --- #}
+    <div class="card border-0 shadow-sm mb-4" id="waitlist">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-hourglass-split me-2 text-club-blue"></i>Waitlist
+      </div>
+      <div class="card-body p-4">
+        <p>If the boat is already reserved on a date you want, you can join the <strong>waitlist</strong> for that day.</p>
+
+        <h6 class="fw-semibold mt-3">How It Works</h6>
+        <ol>
+          <li>Navigate to the date on the calendar — you'll see a "Join Waitlist" button since the day is already taken.</li>
+          <li>Click <strong>Join Waitlist</strong>. You're now in the queue for that day.</li>
+          <li>If the existing reservation is <strong>cancelled</strong>, you'll receive an email notification automatically.</li>
+          <li>Click the link in the email (or navigate to the calendar) and make your reservation before someone else does.</li>
+        </ol>
+
+        <h6 class="fw-semibold mt-3">Managing Your Waitlist</h6>
+        <p class="mb-0">Your active waitlist entries appear in the <strong>My Trips</strong> page. Use the <strong>Leave</strong> button to remove yourself from a waitlist if your plans change. A <span class="badge bg-success">Notified</span> badge means a slot became available and you were emailed.</p>
+      </div>
+    </div>
+
+    {# --- Messages --- #}
+    <div class="card border-0 shadow-sm mb-4" id="messages">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-chat-square-text me-2 text-club-blue"></i>Message Board
+      </div>
+      <div class="card-body p-4">
+        <p>The <strong>Message Board</strong> is the club's communication hub for announcements, trip reports, tips, and general conversation.</p>
+
+        <h6 class="fw-semibold mt-3">Reading Messages</h6>
+        <p>Messages are displayed newest-first. <span class="badge bg-warning text-dark"><i class="bi bi-megaphone me-1"></i>Announcement</span> posts (created by admins) are highlighted with a gold left border and should be read promptly.</p>
+
+        <h6 class="fw-semibold mt-3">Posting a Message</h6>
+        <p>Click <strong>Post Message</strong> and fill in a title and body. You can attach up to <strong>5 photos</strong> per post (images only). Photos are displayed as a thumbnail gallery in your message.</p>
+
+        <h6 class="fw-semibold mt-3">Deleting Messages</h6>
+        <p class="mb-0">You can delete your own messages using the trash icon. Admins can delete any message.</p>
+      </div>
+    </div>
+
+    {# --- Profile --- #}
+    <div class="card border-0 shadow-sm mb-4" id="profile">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-person-gear me-2 text-club-blue"></i>Your Profile
+      </div>
+      <div class="card-body p-4">
+        <p>Access your profile from the <strong>user menu</strong> in the top-right corner of the navbar. Here you can update your contact information and security settings.</p>
+
+        <h6 class="fw-semibold mt-3">Profile Photo</h6>
+        <p>Upload a photo (max 5 MB, any image format). Your photo appears as your avatar on reservations, making it easy for other members to see who has the boat. If you don't upload a photo, your first initial is shown instead.</p>
+
+        <h6 class="fw-semibold mt-3">Phone Number</h6>
+        <p>Add or update your phone number so other members and admins can contact you.</p>
+
+        <h6 class="fw-semibold mt-3">Changing Your Email</h6>
+        <p>Enter a new email address and click <strong>Send Verification</strong>. A verification link will be emailed to the new address. <strong>Your current email remains active</strong> until you click the link in the verification email. Check your inbox (and spam folder) for the email.</p>
+
+        <h6 class="fw-semibold mt-3">Changing Your Password</h6>
+        <p class="mb-0">Enter your current password and a new password (minimum 8 characters). You'll need to confirm the new password before saving. Log in again after changing your password.</p>
+      </div>
+    </div>
+
+    {# --- Fuel Log --- #}
+    <div class="card border-0 shadow-sm mb-4" id="fuel-log">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-fuel-pump me-2 text-club-blue"></i>Fuel Log
+      </div>
+      <div class="card-body p-4">
+        <p>Fuel usage is tracked to help the club manage costs and ensure the boat always has adequate fuel.</p>
+
+        <h6 class="fw-semibold mt-3">Logging Fuel at Check-In</h6>
+        <p>The easiest way to log fuel is during the <strong>check-in</strong> process — enter the gallons added and total cost. A fuel log entry is created automatically.</p>
+
+        <h6 class="fw-semibold mt-3">Manual Fuel Entry</h6>
+        <p class="mb-0">You can also log fuel separately from <strong>My Trips</strong> by clicking the <i class="bi bi-fuel-pump"></i> icon on a past trip. Fill in the date, gallons, price per gallon, and total cost. The system can optionally link the entry to a specific reservation for accurate record-keeping.</p>
+      </div>
+    </div>
+
+    {# --- Incidents --- #}
+    <div class="card border-0 shadow-sm mb-4" id="incidents">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-exclamation-triangle me-2 text-warning"></i>Incident Reports
+      </div>
+      <div class="card-body p-4">
+        <p>If you observe or cause damage to the boat, you must submit an <strong>incident report</strong>. Prompt reporting helps the club respond quickly and keeps the boat safe for everyone.</p>
+
+        <h6 class="fw-semibold mt-3">Severity Levels</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered small">
+            <thead class="table-light">
+              <tr><th>Severity</th><th>Description</th><th>Examples</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge bg-info text-dark">Minor</span></td>
+                <td>Cosmetic or minor issue</td>
+                <td>Scratch, small dent, missing cup holder</td>
+              </tr>
+              <tr>
+                <td><span class="badge bg-warning text-dark">Moderate</span></td>
+                <td>Affects boat operation</td>
+                <td>Broken bilge pump, engine warning light</td>
+              </tr>
+              <tr>
+                <td><span class="badge bg-danger">Major</span></td>
+                <td>Significant damage or safety concern</td>
+                <td>Hull damage, engine failure, navigation equipment</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h6 class="fw-semibold mt-3">Submitting a Report</h6>
+        <p>Navigate to <strong>My Trips</strong> and click the <i class="bi bi-exclamation-triangle text-warning"></i> icon on the relevant past trip, or go to <a href="{{ url_for('new_incident') }}">Report Incident</a> directly. Include as much detail as possible in your description. Reports are reviewed by club administrators.</p>
+
+        <div class="alert alert-warning small mb-0">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          For urgent safety issues, contact the club directly rather than waiting for an incident report to be reviewed.
+        </div>
+      </div>
+    </div>
+
+    {# --- iCal --- #}
+    <div class="card border-0 shadow-sm mb-4" id="ical">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-calendar-plus me-2 text-club-blue"></i>Calendar Subscription (iCal)
+      </div>
+      <div class="card-body p-4">
+        <p>You can subscribe to your reservations in any calendar app that supports iCal feeds (Google Calendar, Apple Calendar, Outlook, etc.).</p>
+
+        <h6 class="fw-semibold mt-3">How to Subscribe</h6>
+        <ol>
+          <li>Go to <strong>My Trips</strong> and click the <i class="bi bi-calendar-plus"></i> icon in the top-right corner.</li>
+          <li>Copy your personal iCal feed URL.</li>
+          <li>In your calendar app, choose <strong>Subscribe to calendar</strong> (or "Add calendar by URL") and paste the URL.</li>
+          <li>Your upcoming boat reservations will appear in your personal calendar and stay in sync automatically.</li>
+        </ol>
+
+        <div class="alert alert-secondary small mb-0">
+          <i class="bi bi-shield-lock me-1"></i>
+          Your iCal URL is personal — it contains a unique token tied to your account. Do not share it with others.
+        </div>
+      </div>
+    </div>
+
+    {# ================================================================
+       ADMIN GUIDE
+       ================================================================ #}
+    {% if current_user.is_admin %}
+    <h5 class="text-uppercase text-muted fw-semibold small mb-3 mt-5" id="admin-guide">
+      <i class="bi bi-shield-check me-1"></i>Admin Guide
+    </h5>
+
+    {# --- Members --- #}
+    <div class="card border-0 shadow-sm mb-4" id="admin-members">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-people me-2 text-club-blue"></i>Managing Members
+      </div>
+      <div class="card-body p-4">
+        <p>Access member management from <strong>Admin → Members</strong>.</p>
+
+        <h6 class="fw-semibold mt-3">Creating a New Member</h6>
+        <p>Click <strong>New Member</strong> and fill in their full name, username, email (optional), and a temporary password. The member can change their password after first login from their profile page.</p>
+
+        <h6 class="fw-semibold mt-3">Per-Member Limits</h6>
+        <p>Each member has configurable limits:</p>
+        <ul>
+          <li><strong>Max Consecutive Days</strong> — How many days in a row they can reserve the boat (default: 3)</li>
+          <li><strong>Max Pending Reservations</strong> — How many upcoming reservations they can hold at once (default: 7)</li>
+        </ul>
+        <p>These limits can be adjusted individually for members who need different access (e.g., officer perks or restricted access).</p>
+
+        <h6 class="fw-semibold mt-3">Deactivating a Member</h6>
+        <p>Click <strong>Deactivate</strong> on a member's row. Deactivated accounts cannot log in. Existing reservations are not automatically cancelled.</p>
+
+        <h6 class="fw-semibold mt-3">Resetting a Password</h6>
+        <p class="mb-0">Click <strong>Reset Password</strong> next to a member's name, set a new temporary password, and share it with them securely. Ask them to change it immediately from their profile.</p>
+      </div>
+    </div>
+
+    {# --- Blackouts --- #}
+    <div class="card border-0 shadow-sm mb-4" id="admin-blackouts">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-calendar-x me-2 text-club-blue"></i>Blackout Dates
+      </div>
+      <div class="card-body p-4">
+        <p>Blackout dates prevent members from making reservations during maintenance windows, club events, or other periods when the boat is unavailable.</p>
+
+        <h6 class="fw-semibold mt-3">Creating a Blackout</h6>
+        <p>Go to <strong>Admin → Blackout Dates → New Blackout</strong>. Specify:</p>
+        <ul>
+          <li><strong>Start / End Date &amp; Time</strong> — Block a full day or a specific time window</li>
+          <li><strong>Reason</strong> — Displayed on the calendar so members know why the date is blocked</li>
+        </ul>
+        <p class="mb-0">Blackouts appear as red events on the calendar. Members cannot create reservations that overlap with a blackout period.</p>
+      </div>
+    </div>
+
+    {# --- Approvals --- #}
+    <div class="card border-0 shadow-sm mb-4" id="admin-approvals">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-hourglass-split me-2 text-club-blue"></i>Reservation Approvals
+      </div>
+      <div class="card-body p-4">
+        <p>If the club has <strong>approval required</strong> mode enabled, all new reservations start with a <span class="badge bg-warning text-dark">Pending</span> status and must be approved by an admin.</p>
+
+        <h6 class="fw-semibold mt-3">Processing Approvals</h6>
+        <p>Go to <strong>Admin → Approvals</strong> to see all pending reservations. For each one:</p>
+        <ul>
+          <li><strong>Approve</strong> — Confirms the reservation; the member is notified by email.</li>
+          <li><strong>Deny</strong> — Rejects the request; the member is notified by email.</li>
+        </ul>
+        <p class="mb-0">When approval mode is <em>off</em>, reservations are confirmed immediately and the approvals queue will be empty.</p>
+      </div>
+    </div>
+
+    {# --- Admin Incidents --- #}
+    <div class="card border-0 shadow-sm mb-4" id="admin-incidents">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-exclamation-triangle me-2 text-club-blue"></i>Incidents
+      </div>
+      <div class="card-body p-4">
+        <p>View all member-submitted damage and incident reports at <strong>Admin → Incidents</strong>.</p>
+
+        <h6 class="fw-semibold mt-3">Resolving an Incident</h6>
+        <p>Once a reported issue has been addressed (repaired, investigated, or noted), click <strong>Resolve</strong> on the incident. The system records your name and timestamp as the resolver. Resolved incidents remain visible for record-keeping but are visually separated from open issues.</p>
+
+        <h6 class="fw-semibold mt-3">Filters</h6>
+        <p class="mb-0">The incidents list shows open (unresolved) incidents by default. Use the page to review the full history of boat condition reports.</p>
+      </div>
+    </div>
+
+    {# --- Fuel Stats --- #}
+    <div class="card border-0 shadow-sm mb-4" id="admin-fuel">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-fuel-pump me-2 text-club-blue"></i>Fuel Statistics
+      </div>
+      <div class="card-body p-4">
+        <p>The <strong>Admin → Fuel Log</strong> page provides a complete view of fuel consumption and costs across all members.</p>
+
+        <h6 class="fw-semibold mt-3">What You'll See</h6>
+        <ul>
+          <li>Per-member fuel totals (gallons and cost)</li>
+          <li>Individual fuel log entries with date, gallons, price per gallon, and linked reservation</li>
+          <li>Club-wide fuel consumption totals</li>
+        </ul>
+        <p class="mb-0">Fuel entries can come from two sources: logged automatically during trip check-in, or entered manually by a member on a past trip.</p>
+      </div>
+    </div>
+
+    {# --- Trip Logs --- #}
+    <div class="card border-0 shadow-sm mb-4" id="admin-trip-logs">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-journal-bookmark me-2 text-club-blue"></i>Trip Logs
+      </div>
+      <div class="card-body p-4">
+        <p>The <strong>Admin → Trip Logs</strong> page shows a complete history of all checkout and check-in records for every member.</p>
+
+        <h6 class="fw-semibold mt-3">What's Recorded</h6>
+        <ul>
+          <li>Member name and reservation date/time</li>
+          <li>Departure time and engine hours at departure</li>
+          <li>Fuel level at departure</li>
+          <li>Return time and engine hours at return (hours used)</li>
+          <li>Fuel added (gallons and cost)</li>
+          <li>Condition notes on departure and return</li>
+          <li>Number of captain's checklist items verified</li>
+        </ul>
+        <p class="mb-0">Trips where only checkout was completed (no check-in yet) are also shown with the available information.</p>
+      </div>
+    </div>
+
+    {# --- Audit Log --- #}
+    <div class="card border-0 shadow-sm mb-4" id="admin-audit">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-journal-text me-2 text-club-blue"></i>Audit Log
+      </div>
+      <div class="card-body p-4">
+        <p>The <strong>Admin → Audit Log</strong> is an immutable record of every significant action taken in the system.</p>
+
+        <h6 class="fw-semibold mt-3">What's Tracked</h6>
+        <ul>
+          <li>Reservations created, cancelled, approved, and denied</li>
+          <li>User accounts created and deactivated</li>
+          <li>Password resets</li>
+          <li>Incident reports submitted</li>
+          <li>Trip check-out and check-in events</li>
+        </ul>
+
+        <h6 class="fw-semibold mt-3">Filtering</h6>
+        <p class="mb-0">By default the log shows the last 30 days. Use the <strong>Days back</strong> selector to view a longer history. Each entry shows the timestamp, user who performed the action, action type, and relevant details.</p>
+      </div>
+    </div>
+
+    {# --- Export CSV --- #}
+    <div class="card border-0 shadow-sm mb-4" id="admin-export">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-download me-2 text-club-blue"></i>Export CSV
+      </div>
+      <div class="card-body p-4">
+        <p>Click <strong>Admin → Export CSV</strong> to download a spreadsheet of all member reservation statistics.</p>
+
+        <h6 class="fw-semibold mt-3">Columns Included</h6>
+        <ul class="mb-0">
+          <li>Member name</li>
+          <li>Number of past (completed) reservations</li>
+          <li>Number of upcoming reservations</li>
+          <li>Total reservations (all time)</li>
+          <li>Number of cancelled reservations</li>
+        </ul>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="text-center text-muted small mt-4 mb-3">
+      <i class="bi bi-anchor me-1"></i>Bentley Boat Club &mdash; Reservation System Help
+    </div>
+
+  </div>
+</div>
+{% endblock %}

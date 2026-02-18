@@ -10,6 +10,10 @@
       </a>
       <h5 class="mb-0 fw-bold">
         <i class="bi bi-exclamation-triangle me-2 text-warning"></i>Report an Incident
+        <a href="{{ url_for('help_page') }}#incidents" class="text-muted ms-1"
+           data-bs-toggle="tooltip" title="Help: Severity levels and what to include in your report">
+          <i class="bi bi-question-circle-fill" style="font-size:0.8rem"></i>
+        </a>
       </h5>
     </div>
 
@@ -25,7 +29,13 @@
           </div>
 
           <div class="mb-3">
-            <label class="form-label">Severity</label>
+            <label class="form-label">
+              Severity
+              <a href="{{ url_for('help_page') }}#incidents" class="text-muted ms-1"
+                 data-bs-toggle="tooltip" title="Minor = cosmetic · Moderate = affects operation · Major = safety concern">
+                <i class="bi bi-question-circle-fill" style="font-size:0.8rem"></i>
+              </a>
+            </label>
             <select class="form-select" name="severity">
               <option value="minor">Minor — cosmetic damage or minor issue</option>
               <option value="moderate">Moderate — affects boat operation</option>

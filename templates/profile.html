@@ -11,6 +11,10 @@
       </a>
       <h5 class="mb-0 fw-bold">
         <i class="bi bi-person-gear me-2 text-club-blue"></i>My Profile
+        <a href="{{ url_for('help_page') }}#profile" class="text-muted ms-1"
+           data-bs-toggle="tooltip" title="Help: Updating your photo, email, and password">
+          <i class="bi bi-question-circle-fill" style="font-size:0.8rem"></i>
+        </a>
       </h5>
     </div>
 
@@ -96,6 +100,10 @@
     <div class="card border-0 shadow-sm mb-4">
       <div class="card-header bg-transparent fw-semibold">
         <i class="bi bi-envelope me-2 text-club-blue"></i>Change Email
+        <a href="{{ url_for('help_page') }}#profile" class="text-muted ms-1"
+           data-bs-toggle="tooltip" title="Help: A verification link is sent to your new address — your current email stays active until confirmed">
+          <i class="bi bi-question-circle-fill" style="font-size:0.8rem"></i>
+        </a>
       </div>
       <div class="card-body p-4">
         {% if user.pending_email %}

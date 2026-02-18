@@ -9,7 +9,13 @@
       <a href="{{ url_for('calendar') }}" class="btn btn-sm btn-outline-secondary me-3">
         <i class="bi bi-arrow-left"></i>
       </a>
-      <h5 class="mb-0 fw-bold"><i class="bi bi-bookmark-star me-2 text-club-blue"></i>My Trips</h5>
+      <h5 class="mb-0 fw-bold">
+        <i class="bi bi-bookmark-star me-2 text-club-blue"></i>My Trips
+        <a href="{{ url_for('help_page') }}#my-trips" class="text-muted ms-1"
+           data-bs-toggle="tooltip" title="Help: Managing reservations, check-out and check-in">
+          <i class="bi bi-question-circle-fill" style="font-size:0.8rem"></i>
+        </a>
+      </h5>
       <a href="{{ url_for('ical_token_page') }}" class="btn btn-sm btn-outline-secondary ms-auto"
          title="Subscribe to calendar">
         <i class="bi bi-calendar-plus"></i>
@@ -19,6 +25,10 @@
     {# ---- Upcoming Reservations ---- #}
     <h6 class="text-uppercase text-muted fw-semibold small mb-2">
       <i class="bi bi-calendar-check me-1"></i>Upcoming
+      <a href="{{ url_for('help_page') }}#my-trips" class="text-muted ms-1"
+         data-bs-toggle="tooltip" title="Help: Check Out and Check In on the day of your trip">
+        <i class="bi bi-question-circle-fill"></i>
+      </a>
     </h6>
 
     {% if upcoming %}
@@ -86,6 +96,10 @@
     {# ---- Past / Cancelled Reservations ---- #}
     <h6 class="text-uppercase text-muted fw-semibold small mb-2">
       <i class="bi bi-clock-history me-1"></i>Past &amp; Cancelled
+      <a href="{{ url_for('help_page') }}#fuel-log" class="text-muted ms-1"
+         data-bs-toggle="tooltip" title="Help: Logging fuel and reporting incidents for past trips">
+        <i class="bi bi-question-circle-fill"></i>
+      </a>
     </h6>
 
     {% if past %}
@@ -143,6 +157,10 @@
     {% if waitlist %}
     <h6 class="text-uppercase text-muted fw-semibold small mb-2 mt-4">
       <i class="bi bi-hourglass-split me-1"></i>Waitlist
+      <a href="{{ url_for('help_page') }}#waitlist" class="text-muted ms-1"
+         data-bs-toggle="tooltip" title="Help: How the waitlist and notifications work">
+        <i class="bi bi-question-circle-fill"></i>
+      </a>
     </h6>
     <div class="card border-0 shadow-sm">
       <ul class="list-group list-group-flush">
