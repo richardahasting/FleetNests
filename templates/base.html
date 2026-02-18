@@ -116,5 +116,156 @@
   });
 </script>
 {% block scripts %}{% endblock %}
+
+{% if current_user %}
+{# ── Floating feedback button ─────────────────────────────────────────── #}
+<button class="btn btn-gold rounded-pill shadow"
+        style="position:fixed;bottom:1.5rem;right:1.5rem;z-index:1050;"
+        data-bs-toggle="modal" data-bs-target="#feedbackModal">
+  <i class="bi bi-chat-heart me-1"></i>Feedback
+</button>
+
+{# ── Feedback modal ───────────────────────────────────────────────────── #}
+<div class="modal fade" id="feedbackModal" tabindex="-1"
+     aria-labelledby="feedbackModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+
+      <div class="modal-header text-white"
+           style="background:linear-gradient(135deg,#0A2342 0%,#1a3a5c 100%);">
+        <h5 class="modal-title" id="feedbackModalLabel"
+            style="font-family:'Playfair Display',serif;color:#C9A84C;">
+          <i class="bi bi-chat-heart me-2"></i>Share Feedback
+        </h5>
+        <button type="button" class="btn-close btn-close-white"
+                data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        {# Default state: form #}
+        <div id="fbForm">
+          <p class="text-muted small mb-3">
+            <i class="bi bi-bug me-1"></i>Bugs &amp; feature requests → GitHub &nbsp;·&nbsp;
+            <i class="bi bi-envelope me-1"></i>Everything else → email
+          </p>
+          <div class="mb-3">
+            <label for="fbText" class="form-label fw-semibold">Your feedback</label>
+            <textarea id="fbText" class="form-control" rows="5"
+                      maxlength="4000" required
+                      placeholder="Describe a bug, suggest a feature, or share a thought…"></textarea>
+            <div class="form-text text-end">
+              <span id="fbCharCount">0</span> / 4000
+            </div>
+          </div>
+          <div class="mb-2">
+            <label for="fbScreenshot" class="form-label fw-semibold">
+              Screenshot <span class="text-muted fw-normal">(optional)</span>
+            </label>
+            <input type="file" id="fbScreenshot" class="form-control"
+                   accept="image/jpeg,image/png,image/gif,image/webp">
+            <div class="form-text">JPEG, PNG, GIF, or WebP · max 5 MB</div>
+          </div>
+          <div id="fbErrorBanner" class="alert alert-danger py-2 d-none" role="alert"></div>
+        </div>
+
+        {# Success state: hidden initially #}
+        <div id="fbSuccess" class="text-center py-4 d-none">
+          <i class="bi bi-check-circle-fill text-success" style="font-size:2.5rem;"></i>
+          <p class="mt-3 mb-0 fw-semibold" id="fbSuccessMsg"></p>
+        </div>
+      </div>
+
+      <div class="modal-footer" id="fbFooter">
+        <button type="button" class="btn btn-outline-secondary"
+                data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-gold" id="fbSendBtn"
+                onclick="submitFeedback()">
+          <span id="fbBtnLabel"><i class="bi bi-send me-1"></i>Send</span>
+          <span id="fbBtnSpinner" class="d-none">
+            <span class="spinner-border spinner-border-sm me-1" role="status"></span>Sending…
+          </span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  // Reset modal to default state on every open
+  document.getElementById('feedbackModal').addEventListener('show.bs.modal', function () {
+    document.getElementById('fbText').value = '';
+    document.getElementById('fbScreenshot').value = '';
+    document.getElementById('fbCharCount').textContent = '0';
+    document.getElementById('fbErrorBanner').classList.add('d-none');
+    document.getElementById('fbErrorBanner').textContent = '';
+    document.getElementById('fbForm').classList.remove('d-none');
+    document.getElementById('fbSuccess').classList.add('d-none');
+    document.getElementById('fbFooter').classList.remove('d-none');
+    _fbSetSending(false);
+  });
+
+  document.getElementById('fbText').addEventListener('input', function () {
+    document.getElementById('fbCharCount').textContent = this.value.length;
+  });
+
+  function _fbSetSending(sending) {
+    document.getElementById('fbSendBtn').disabled = sending;
+    document.getElementById('fbBtnLabel').classList.toggle('d-none', sending);
+    document.getElementById('fbBtnSpinner').classList.toggle('d-none', !sending);
+  }
+
+  window.submitFeedback = function () {
+    var text = document.getElementById('fbText').value.trim();
+    if (!text) {
+      var banner = document.getElementById('fbErrorBanner');
+      banner.textContent = 'Please enter your feedback before sending.';
+      banner.classList.remove('d-none');
+      return;
+    }
+
+    _fbSetSending(true);
+    document.getElementById('fbErrorBanner').classList.add('d-none');
+
+    var fd = new FormData();
+    fd.append('feedback_text', text);
+    var file = document.getElementById('fbScreenshot').files[0];
+    if (file) fd.append('screenshot', file);
+
+    fetch('{{ url_for("submit_feedback") }}', {method: 'POST', body: fd})
+      .then(function (r) { return r.json().then(function (d) { return {ok: r.ok, data: d}; }); })
+      .then(function (res) {
+        if (res.data.ok) {
+          var msgs = {
+            'github_issue':   'Filed as a GitHub issue — thanks for the report!',
+            'email':          'Sent to the club team — thanks for the feedback!',
+            'fallback_email': 'Sent to the club team — thanks!'
+          };
+          document.getElementById('fbForm').classList.add('d-none');
+          document.getElementById('fbFooter').classList.add('d-none');
+          document.getElementById('fbSuccessMsg').textContent =
+            msgs[res.data.action] || 'Feedback sent — thank you!';
+          document.getElementById('fbSuccess').classList.remove('d-none');
+          setTimeout(function () {
+            bootstrap.Modal.getInstance(document.getElementById('feedbackModal')).hide();
+          }, 3000);
+        } else {
+          var banner = document.getElementById('fbErrorBanner');
+          banner.textContent = res.data.error || 'Something went wrong. Please try again.';
+          banner.classList.remove('d-none');
+          _fbSetSending(false);
+        }
+      })
+      .catch(function () {
+        var banner = document.getElementById('fbErrorBanner');
+        banner.textContent = 'Network error. Please check your connection and try again.';
+        banner.classList.remove('d-none');
+        _fbSetSending(false);
+      });
+  };
+}());
+</script>
+{% endif %}
 </body>
 </html>

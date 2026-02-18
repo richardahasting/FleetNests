@@ -849,6 +849,42 @@ def register_routes(app: Flask):
         logs = models.get_all_trip_logs()
         return render_template("admin/trip_logs.html", logs=logs)
 
+    # -- Member Feedback (AI-routed) ----------------------------------------
+
+    @app.route("/feedback", methods=["POST"])
+    @auth.login_required
+    def submit_feedback():
+        # Lazy import so a missing anthropic package doesn't crash startup
+        import feedback as fb
+
+        user = auth.current_user()
+        text = request.form.get("feedback_text", "").strip()
+        if not text:
+            return jsonify({"ok": False, "error": "Feedback text is required."}), 400
+
+        image_bytes = None
+        image_type  = None
+        screenshot  = request.files.get("screenshot")
+        if screenshot and screenshot.filename:
+            image_type = screenshot.content_type or ""
+            if image_type not in fb.ALLOWED_IMAGE_TYPES:
+                return jsonify({"ok": False,
+                                "error": "Screenshot must be JPEG, PNG, GIF, or WebP."}), 400
+            data = screenshot.read(5 * 1024 * 1024 + 1)
+            if len(data) > 5 * 1024 * 1024:
+                return jsonify({"ok": False,
+                                "error": "Screenshot must be 5 MB or smaller."}), 400
+            image_bytes = data
+
+        ok, action = fb.process_feedback(user, text, image_bytes, image_type)
+        if not ok:
+            return jsonify({"ok": False,
+                            "error": "Could not deliver your feedback. Please try again."}), 500
+
+        models.log_action(user["id"], "feedback_submitted", None, None,
+                          {"action": action, "length": len(text)})
+        return jsonify({"ok": True, "action": action})
+
 
 # ---------------------------------------------------------------------------
 # Entry point
