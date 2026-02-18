@@ -39,6 +39,14 @@
             <label class="form-check-label" for="is_admin">Grant admin privileges</label>
           </div>
         </div>
+        <div class="col-md-3">
+          <label class="form-label">Max Consecutive Days</label>
+          <input type="number" class="form-control" name="max_consecutive_days" value="3" min="1" max="30">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Max Pending</label>
+          <input type="number" class="form-control" name="max_pending" value="7" min="1" max="50">
+        </div>
         <div class="col-12">
           <button type="submit" class="btn btn-club-blue me-2">
             <i class="bi bi-person-check me-1"></i>Create Member

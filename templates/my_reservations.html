@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}My Trips — Bentley Boat Club{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-7">
+
+    <div class="d-flex align-items-center mb-4">
+      <a href="{{ url_for('calendar') }}" class="btn btn-sm btn-outline-secondary me-3">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <h5 class="mb-0 fw-bold"><i class="bi bi-bookmark-star me-2 text-club-blue"></i>My Trips</h5>
+      <a href="{{ url_for('ical_token_page') }}" class="btn btn-sm btn-outline-secondary ms-auto"
+         title="Subscribe to calendar">
+        <i class="bi bi-calendar-plus"></i>
+      </a>
+    </div>
+
+    {# ---- Upcoming Reservations ---- #}
+    <h6 class="text-uppercase text-muted fw-semibold small mb-2">
+      <i class="bi bi-calendar-check me-1"></i>Upcoming
+    </h6>
+
+    {% if upcoming %}
+    <div class="card border-0 shadow-sm mb-4">
+      <ul class="list-group list-group-flush">
+        {% for res in upcoming %}
+        <li class="list-group-item py-3">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="fw-semibold">
+                {{ res.date.strftime('%A, %B %d, %Y') }}
+              </div>
+              <div class="text-muted small">
+                {{ res.start_time.strftime('%-I:%M %p') }} – {{ res.end_time.strftime('%-I:%M %p') }} CT
+                &nbsp;&middot;&nbsp;
+                {% set hours = ((res.end_time - res.start_time).total_seconds() / 3600) %}
+                {{ hours | int if hours == hours | int else "%.1f" | format(hours) }} hrs
+              </div>
+              {% if res.notes %}
+              <div class="text-secondary small mt-1">
+                <i class="bi bi-chat-left-text me-1"></i>{{ res.notes }}
+              </div>
+              {% endif %}
+            </div>
+            <div class="d-flex align-items-center gap-2 ms-3 flex-shrink-0 flex-wrap">
+              <span class="badge bg-success">Active</span>
+              <form method="post" action="{{ url_for('cancel_reservation', res_id=res.id) }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('Cancel this reservation?')">
+                  <i class="bi bi-x-circle me-1"></i>Cancel
+                </button>
+              </form>
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% else %}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body text-muted text-center py-4">
+        <i class="bi bi-calendar-x fs-3 d-block mb-2"></i>
+        No upcoming reservations.
+        <a href="{{ url_for('calendar') }}" class="d-block mt-2">Book a trip on the calendar</a>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ---- Past / Cancelled Reservations ---- #}
+    <h6 class="text-uppercase text-muted fw-semibold small mb-2">
+      <i class="bi bi-clock-history me-1"></i>Past &amp; Cancelled
+    </h6>
+
+    {% if past %}
+    <div class="card border-0 shadow-sm">
+      <ul class="list-group list-group-flush">
+        {% for res in past %}
+        <li class="list-group-item py-3">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="fw-semibold text-muted">
+                {{ res.date.strftime('%A, %B %d, %Y') }}
+              </div>
+              <div class="text-muted small">
+                {{ res.start_time.strftime('%-I:%M %p') }} – {{ res.end_time.strftime('%-I:%M %p') }} CT
+                &nbsp;&middot;&nbsp;
+                {% set hours = ((res.end_time - res.start_time).total_seconds() / 3600) %}
+                {{ hours | int if hours == hours | int else "%.1f" | format(hours) }} hrs
+              </div>
+              {% if res.notes %}
+              <div class="text-secondary small mt-1">
+                <i class="bi bi-chat-left-text me-1"></i>{{ res.notes }}
+              </div>
+              {% endif %}
+            </div>
+            <div class="d-flex align-items-center gap-2 ms-3 flex-shrink-0 flex-wrap">
+              {% if res.status == 'cancelled' %}
+              <span class="badge bg-secondary">Cancelled</span>
+              {% else %}
+              <span class="badge bg-light text-dark border">Past</span>
+              <a href="{{ url_for('new_fuel_entry') }}?res_id={{ res.id }}"
+                 class="btn btn-sm btn-outline-danger" title="Log fuel">
+                <i class="bi bi-fuel-pump"></i>
+              </a>
+              <a href="{{ url_for('new_incident') }}?res_id={{ res.id }}"
+                 class="btn btn-sm btn-outline-warning" title="Report incident">
+                <i class="bi bi-exclamation-triangle"></i>
+              </a>
+              {% endif %}
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% else %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-muted text-center py-4">
+        <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+        No past reservations yet.
+      </div>
+    </div>
+    {% endif %}
+
+    {# ---- Waitlist ---- #}
+    {% if waitlist %}
+    <h6 class="text-uppercase text-muted fw-semibold small mb-2 mt-4">
+      <i class="bi bi-hourglass-split me-1"></i>Waitlist
+    </h6>
+    <div class="card border-0 shadow-sm">
+      <ul class="list-group list-group-flush">
+        {% for w in waitlist %}
+        <li class="list-group-item py-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="fw-semibold">{{ w.desired_date.strftime('%A, %B %d, %Y') }}</div>
+              {% if w.notes %}
+              <div class="text-muted small">{{ w.notes }}</div>
+              {% endif %}
+              {% if w.notified %}
+              <span class="badge bg-success small">Notified — slot became available</span>
+              {% endif %}
+            </div>
+            <form method="post" action="{{ url_for('waitlist_leave', res_date=w.desired_date.isoformat()) }}">
+              <button type="submit" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-x me-1"></i>Leave
+              </button>
+            </form>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

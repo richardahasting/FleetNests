@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Incident Reports — Admin — Bentley Boat Club{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="fw-bold mb-0">
+    <i class="bi bi-exclamation-triangle me-2 text-warning"></i>Incident Reports
+  </h5>
+  <span class="badge bg-secondary">{{ incidents | length }} total</span>
+</div>
+
+{% if incidents %}
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Date</th>
+          <th>Member</th>
+          <th>Severity</th>
+          <th>Description</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inc in incidents %}
+        <tr class="{{ 'table-success' if inc.resolved else '' }}">
+          <td class="text-nowrap small">{{ inc.report_date.strftime('%b %d, %Y') }}</td>
+          <td>{{ inc.full_name }}</td>
+          <td>
+            {% if inc.severity == 'major' %}
+              <span class="badge bg-danger">Major</span>
+            {% elif inc.severity == 'moderate' %}
+              <span class="badge bg-warning text-dark">Moderate</span>
+            {% else %}
+              <span class="badge bg-secondary">Minor</span>
+            {% endif %}
+          </td>
+          <td class="small">{{ inc.description[:120] }}{% if inc.description|length > 120 %}…{% endif %}</td>
+          <td>
+            {% if inc.resolved %}
+              <span class="badge bg-success">Resolved</span>
+              {% if inc.resolver_name %}
+              <div class="text-muted small">by {{ inc.resolver_name }}</div>
+              {% endif %}
+            {% else %}
+              <span class="badge bg-warning text-dark">Open</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if not inc.resolved %}
+            <form method="post" action="{{ url_for('admin_resolve_incident', inc_id=inc.id) }}">
+              <button type="submit" class="btn btn-sm btn-outline-success"
+                      onclick="return confirm('Mark as resolved?')">
+                <i class="bi bi-check-circle"></i>
+              </button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-shield-check fs-1 d-block mb-2 text-success"></i>
+    No incident reports on file.
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -3,14 +3,17 @@
 --   psql -U bentley_user -d bentley_boat -f init_db.sql
 
 CREATE TABLE IF NOT EXISTS users (
-    id            SERIAL PRIMARY KEY,
-    username      VARCHAR(50) UNIQUE NOT NULL,
-    full_name     VARCHAR(100) NOT NULL,
-    email         VARCHAR(100),
-    password_hash VARCHAR(255) NOT NULL,
-    is_admin      BOOLEAN DEFAULT FALSE,
-    is_active     BOOLEAN DEFAULT TRUE,
-    created_at    TIMESTAMP DEFAULT NOW()
+    id                   SERIAL PRIMARY KEY,
+    username             VARCHAR(50) UNIQUE NOT NULL,
+    full_name            VARCHAR(100) NOT NULL,
+    email                VARCHAR(100),
+    password_hash        VARCHAR(255) NOT NULL,
+    is_admin             BOOLEAN DEFAULT FALSE,
+    is_active            BOOLEAN DEFAULT TRUE,
+    max_consecutive_days INTEGER DEFAULT 3,
+    max_pending          INTEGER DEFAULT 7,
+    ical_token           VARCHAR(64) UNIQUE,
+    created_at           TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS reservations (
@@ -20,6 +23,7 @@ CREATE TABLE IF NOT EXISTS reservations (
     start_time   TIMESTAMP NOT NULL,
     end_time     TIMESTAMP NOT NULL,
     status       VARCHAR(20) DEFAULT 'active',  -- active | cancelled
+    notes        VARCHAR(300),
     created_at   TIMESTAMP DEFAULT NOW(),
     cancelled_at TIMESTAMP
     -- No UNIQUE(date): multiple non-overlapping slots per day are allowed.
@@ -36,9 +40,54 @@ CREATE TABLE IF NOT EXISTS messages (
     updated_at      TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_res_date   ON reservations(date);
-CREATE INDEX IF NOT EXISTS idx_res_user   ON reservations(user_id);
-CREATE INDEX IF NOT EXISTS idx_res_status ON reservations(status);
+CREATE TABLE IF NOT EXISTS blackout_dates (
+    id          SERIAL PRIMARY KEY,
+    start_time  TIMESTAMP NOT NULL,
+    end_time    TIMESTAMP NOT NULL,
+    reason      VARCHAR(200) NOT NULL,
+    created_by  INTEGER REFERENCES users(id),
+    created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS incident_reports (
+    id          SERIAL PRIMARY KEY,
+    user_id     INTEGER REFERENCES users(id),
+    res_id      INTEGER REFERENCES reservations(id),
+    report_date DATE NOT NULL,
+    severity    VARCHAR(20) NOT NULL DEFAULT 'minor',
+    description TEXT NOT NULL,
+    resolved    BOOLEAN DEFAULT FALSE,
+    resolved_by INTEGER REFERENCES users(id),
+    resolved_at TIMESTAMP,
+    created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS fuel_log (
+    id               SERIAL PRIMARY KEY,
+    user_id          INTEGER REFERENCES users(id),
+    res_id           INTEGER REFERENCES reservations(id),
+    log_date         DATE NOT NULL,
+    gallons          NUMERIC(6,2) NOT NULL,
+    price_per_gallon NUMERIC(6,3),
+    total_cost       NUMERIC(8,2),
+    notes            VARCHAR(300),
+    created_at       TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS waitlist (
+    id           SERIAL PRIMARY KEY,
+    user_id      INTEGER REFERENCES users(id),
+    desired_date DATE NOT NULL,
+    notes        VARCHAR(300),
+    notified     BOOLEAN DEFAULT FALSE,
+    created_at   TIMESTAMP DEFAULT NOW(),
+    UNIQUE(user_id, desired_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_res_date       ON reservations(date);
+CREATE INDEX IF NOT EXISTS idx_res_user       ON reservations(user_id);
+CREATE INDEX IF NOT EXISTS idx_res_status     ON reservations(status);
+CREATE INDEX IF NOT EXISTS idx_blackout_start ON blackout_dates(start_time);
 
 -- First admin account: username=admin, password=changeme
 -- CHANGE THIS PASSWORD immediately after first login via Admin > Reset Password

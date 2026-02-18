@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Blackout Dates — Admin — Bentley Boat Club{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="fw-bold mb-0"><i class="bi bi-calendar-x me-2 text-danger"></i>Blackout Dates</h5>
+  <a href="{{ url_for('admin_new_blackout') }}" class="btn btn-sm btn-danger">
+    <i class="bi bi-plus-lg me-1"></i>Add Blackout
+  </a>
+</div>
+
+{% if show_form %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-danger text-white fw-semibold">
+    <i class="bi bi-calendar-x me-1"></i>Block the Boat
+  </div>
+  <div class="card-body p-4">
+    <form method="post">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Date</label>
+          <input type="date" class="form-control" name="date" required>
+        </div>
+        <div class="col-12">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="all_day" id="all_day" checked onchange="toggleTimes()">
+            <label class="form-check-label" for="all_day">All day</label>
+          </div>
+        </div>
+        <div class="col-md-3" id="startTimeField" style="display:none">
+          <label class="form-label">Start Time</label>
+          <input type="time" class="form-control" name="start_time" step="1800">
+        </div>
+        <div class="col-md-3" id="endTimeField" style="display:none">
+          <label class="form-label">End Time</label>
+          <input type="time" class="form-control" name="end_time" step="1800">
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">Reason</label>
+          <input type="text" class="form-control" name="reason" maxlength="200" placeholder="e.g. Annual maintenance, Club race day" required>
+        </div>
+        <div class="col-12">
+          <button type="submit" class="btn btn-danger me-2">
+            <i class="bi bi-calendar-x me-1"></i>Block Date
+          </button>
+          <a href="{{ url_for('admin_blackouts') }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Date</th><th>Time</th><th>Reason</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for b in blackouts %}
+        <tr>
+          <td>{{ b.start_time.strftime('%a, %b %d, %Y') }}</td>
+          <td class="text-muted">
+            {% if b.start_time.strftime('%H:%M') == '00:00' and b.end_time.strftime('%H:%M') == '23:59' %}
+              All day
+            {% else %}
+              {{ b.start_time.strftime('%-I:%M %p') }} &ndash; {{ b.end_time.strftime('%-I:%M %p') }} CT
+            {% endif %}
+          </td>
+          <td>{{ b.reason }}</td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('admin_delete_blackout', blackout_id=b.id) }}"
+                  onsubmit="return confirm('Remove this blackout?')">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center text-muted py-4">No blackout dates.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function toggleTimes() {
+  const allDay = document.getElementById('all_day').checked;
+  document.getElementById('startTimeField').style.display = allDay ? 'none' : '';
+  document.getElementById('endTimeField').style.display = allDay ? 'none' : '';
+}
+</script>
+{% endblock %}

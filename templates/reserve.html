@@ -20,27 +20,74 @@
       </div>
       <ul class="list-group list-group-flush">
         {% for res in existing %}
-        <li class="list-group-item d-flex justify-content-between align-items-center py-2">
-          <div>
-            <div class="res-avatar-sm d-inline-flex me-2">{{ res.full_name[0] }}</div>
-            <strong>{{ res.full_name }}</strong>
-            <span class="text-muted ms-2">
-              {{ res.start_time.strftime('%-I:%M %p') }} – {{ res.end_time.strftime('%-I:%M %p') }} CT
-            </span>
+        <li class="list-group-item py-2">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div>
+                <div class="res-avatar-sm d-inline-flex me-2">{{ res.full_name[0] }}</div>
+                <strong>{{ res.full_name }}</strong>
+                <span class="text-muted ms-2">
+                  {{ res.start_time.strftime('%-I:%M %p') }} – {{ res.end_time.strftime('%-I:%M %p') }} CT
+                </span>
+              </div>
+              {% if res.notes %}
+              <div class="text-secondary small ms-4 mt-1">
+                <i class="bi bi-chat-left-text me-1"></i>{{ res.notes }}
+              </div>
+              {% endif %}
+            </div>
+            {% if res.user_id == current_user.id or current_user.is_admin %}
+            <form method="post" action="{{ url_for('cancel_reservation', res_id=res.id) }}" class="ms-2">
+              <button type="submit" class="btn btn-sm btn-outline-danger"
+                      onclick="return confirm('Cancel this reservation?')">
+                <i class="bi bi-x-circle"></i>
+              </button>
+            </form>
+            {% endif %}
           </div>
-          {% if res.user_id == current_user.id or current_user.is_admin %}
-          <form method="post" action="{{ url_for('cancel_reservation', res_id=res.id) }}">
-            <button type="submit" class="btn btn-sm btn-outline-danger"
-                    onclick="return confirm('Cancel this reservation?')">
-              <i class="bi bi-x-circle"></i>
-            </button>
-          </form>
-          {% endif %}
         </li>
         {% endfor %}
       </ul>
     </div>
     {% endif %}
+
+{# ---- Waitlist button (only for future days with existing reservations) ---- #}
+{% if day >= today and existing and not user_has_res %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-3 px-4">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <div class="fw-semibold small">This day is already reserved.</div>
+        <div class="text-muted small">Join the waitlist to be notified if a slot opens.</div>
+      </div>
+      {% if on_waitlist %}
+      <form method="post" action="{{ url_for('waitlist_leave', res_date=day.isoformat()) }}">
+        <button type="submit" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-x me-1"></i>Leave Waitlist
+        </button>
+      </form>
+      {% else %}
+      <form method="post" action="{{ url_for('waitlist_join', res_date=day.isoformat()) }}" class="d-flex gap-2">
+        <button type="submit" class="btn btn-sm btn-outline-club-blue">
+          <i class="bi bi-hourglass-split me-1"></i>Join Waitlist
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ---- Weather forecast ---- #}
+{% set days_ahead = (day - today).days %}
+{% if 0 <= days_ahead <= 6 %}
+<div class="card border-0 shadow-sm mb-3" id="weatherCard">
+  <div class="card-body py-2 px-3">
+    <small class="text-muted"><i class="bi bi-cloud-sun me-1"></i>Forecast</small>
+    <div id="weatherData" class="mt-1 text-muted small">Loading...</div>
+  </div>
+</div>
+{% endif %}
 
     {# ---- Reserve form ---- #}
     {% if day < today %}
@@ -78,6 +125,18 @@
           {# Live duration feedback #}
           <div id="durationHint" class="form-text mt-2"></div>
 
+          <div class="mt-3">
+            <label class="form-label" for="notes">
+              Notes <span class="text-muted fw-normal">(optional)</span>
+            </label>
+            <textarea class="form-control" id="notes" name="notes"
+                      rows="2" maxlength="300"
+                      placeholder="e.g. fishing trip, water skiing, family outing…"></textarea>
+            <div class="form-text text-end">
+              <span id="notesCount">0</span>/300
+            </div>
+          </div>
+
           <button type="submit" class="btn btn-club-blue mt-3 w-100" id="submitBtn">
             <i class="bi bi-check-lg me-1"></i>Reserve
           </button>
@@ -97,6 +156,15 @@
   const endEl   = document.getElementById('end_time');
   const hint    = document.getElementById('durationHint');
   const btn     = document.getElementById('submitBtn');
+  const notesEl = document.getElementById('notes');
+  const countEl = document.getElementById('notesCount');
+
+  if (notesEl && countEl) {
+    notesEl.addEventListener('input', function () {
+      countEl.textContent = notesEl.value.length;
+    });
+  }
+
   if (!startEl) return;
 
   function update() {
@@ -128,5 +196,51 @@
   startEl.addEventListener('change', update);
   endEl.addEventListener('change', update);
 })();
+</script>
+
+<script>
+// Weather from Open-Meteo (free, no key required)
+// Boat location: Lake Belton, TX approximate coordinates
+const weatherCard = document.getElementById('weatherData');
+if (weatherCard) {
+  const lat = 31.15, lon = -97.47;  // Lake Belton, TX
+  const dateStr = '{{ day.isoformat() }}';
+  fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,windspeed_10m_max,weathercode&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=America%2FChicago&start_date=${dateStr}&end_date=${dateStr}`)
+    .then(r => r.json())
+    .then(data => {
+      const d = data.daily;
+      const wmo = d.weathercode[0];
+      const desc = wmoDescription(wmo);
+      const icon = wmoIcon(wmo);
+      weatherCard.innerHTML = `${icon} <strong>${desc}</strong> &nbsp;
+        <span class="text-dark">High ${Math.round(d.temperature_2m_max[0])}°F / Low ${Math.round(d.temperature_2m_min[0])}°F</span> &nbsp;
+        <i class="bi bi-droplet text-primary"></i> ${d.precipitation_probability_max[0]}% rain &nbsp;
+        <i class="bi bi-wind"></i> ${Math.round(d.windspeed_10m_max[0])} mph`;
+    })
+    .catch(() => { weatherCard.textContent = 'Forecast unavailable.'; });
+}
+
+function wmoDescription(code) {
+  if (code === 0) return 'Clear sky';
+  if (code <= 2) return 'Partly cloudy';
+  if (code === 3) return 'Overcast';
+  if (code <= 49) return 'Foggy';
+  if (code <= 59) return 'Drizzle';
+  if (code <= 69) return 'Rain';
+  if (code <= 79) return 'Snow';
+  if (code <= 82) return 'Rain showers';
+  if (code <= 99) return 'Thunderstorms';
+  return 'Unknown';
+}
+function wmoIcon(code) {
+  if (code === 0) return '☀️';
+  if (code <= 2) return '⛅';
+  if (code === 3) return '☁️';
+  if (code <= 49) return '🌫️';
+  if (code <= 69) return '🌧️';
+  if (code <= 79) return '❄️';
+  if (code <= 82) return '🌦️';
+  return '⛈️';
+}
 </script>
 {% endblock %}
