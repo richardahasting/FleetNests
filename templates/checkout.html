@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Check Out — Bentley Boat Club{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-6">
+
+    <div class="d-flex align-items-center mb-4">
+      <a href="{{ url_for('my_reservations') }}" class="btn btn-sm btn-outline-secondary me-3">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <div>
+        <h5 class="mb-0 fw-bold">
+          <i class="bi bi-box-arrow-right me-2 text-club-blue"></i>Check Out
+        </h5>
+        <div class="text-muted small">
+          {{ res.date.strftime('%A, %B %d, %Y') }}
+          &middot;
+          {{ res.start_time.strftime('%-I:%M %p') }}–{{ res.end_time.strftime('%-I:%M %p') }} CT
+        </div>
+      </div>
+    </div>
+
+    <form method="post" id="checkoutForm">
+
+      {# ---- Captain's Checklist ---- #}
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent fw-semibold d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-clipboard2-check me-2 text-club-blue"></i>Captain's Checklist</span>
+          <span class="badge bg-secondary" id="checkCount">0 / {{ CAPTAIN_CHECKLIST|length }} checked</span>
+        </div>
+        <div class="card-body p-0">
+          <div class="accordion accordion-flush" id="checklistAccordion">
+            {% for cat_name, indices in CHECKLIST_CATEGORIES %}
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed py-2" type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#cat{{ loop.index0 }}">
+                  {{ cat_name }}
+                  <span class="ms-2 text-muted small cat-count" data-cat="{{ loop.index0 }}"></span>
+                </button>
+              </h2>
+              <div id="cat{{ loop.index0 }}" class="accordion-collapse collapse"
+                   data-bs-parent="#checklistAccordion">
+                <div class="accordion-body py-2">
+                  {% for idx in indices %}
+                  <div class="form-check mb-2">
+                    <input class="form-check-input checklist-item" type="checkbox"
+                           name="checklist" value="{{ idx }}"
+                           id="item{{ idx }}">
+                    <label class="form-check-label small" for="item{{ idx }}">
+                      {{ CAPTAIN_CHECKLIST[idx] }}
+                    </label>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="card-footer bg-transparent text-muted small">
+          <i class="bi bi-info-circle me-1"></i>Advisory only — check what applies, submit when ready.
+        </div>
+      </div>
+
+      {# ---- Departure Details ---- #}
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent fw-semibold">
+          <i class="bi bi-speedometer2 me-2 text-club-blue"></i>Departure Details
+        </div>
+        <div class="card-body p-4">
+
+          <div class="mb-3">
+            <label class="form-label">Departure Time <span class="text-danger">*</span></label>
+            <input type="time" class="form-control" name="checkout_time"
+                   value="{{ now_time }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Engine Hours (out) <small class="text-muted">(optional)</small></label>
+            <input type="number" class="form-control" name="motor_hours_out"
+                   min="0" step="0.1" placeholder="e.g. 124.5">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Fuel Level</label>
+            <div class="btn-group w-100" role="group" aria-label="Fuel level">
+              {% for code, (label, color) in FUEL_LEVELS.items() %}
+              <input type="radio" class="btn-check" name="fuel_level_out"
+                     id="fuel_{{ code }}" value="{{ code }}" autocomplete="off">
+              <label class="btn btn-outline-{{ color }}" for="fuel_{{ code }}">{{ label }}</label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Condition Notes <small class="text-muted">(optional)</small></label>
+            <textarea class="form-control" name="condition_out" rows="3"
+                      placeholder="Any pre-existing damage, issues, or general condition notes…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mb-4">
+        <button type="submit" class="btn btn-club-blue">
+          <i class="bi bi-check2-circle me-1"></i>Complete Check-Out
+        </button>
+        <a href="{{ url_for('my_reservations') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Live checklist counter
+const total = {{ CAPTAIN_CHECKLIST|length }};
+const countBadge = document.getElementById('checkCount');
+const catCounts  = {};
+
+// Build category index mapping: item index → category index
+const itemCats = {};
+{% for cat_name, indices in CHECKLIST_CATEGORIES %}
+{% set cat_idx = loop.index0 %}
+{% for idx in indices %}
+itemCats[{{ idx }}] = {{ cat_idx }};
+{% endfor %}
+{% endfor %}
+
+function updateCounts() {
+  const checked = document.querySelectorAll('.checklist-item:checked');
+  countBadge.textContent = checked.length + ' / ' + total + ' checked';
+  countBadge.className = 'badge ' + (checked.length === total ? 'bg-success' : 'bg-secondary');
+
+  // Per-category counts
+  const perCat = {};
+  checked.forEach(cb => {
+    const cat = itemCats[parseInt(cb.value)];
+    perCat[cat] = (perCat[cat] || 0) + 1;
+  });
+  document.querySelectorAll('.cat-count').forEach(el => {
+    const cat = parseInt(el.dataset.cat);
+    const sizes = { {% for cat_name, indices in CHECKLIST_CATEGORIES %}{{ loop.index0 }}: {{ indices|length }}{% if not loop.last %}, {% endif %}{% endfor %} };
+    const n = perCat[cat] || 0;
+    el.textContent = n > 0 ? '(' + n + '/' + sizes[cat] + ')' : '';
+  });
+}
+
+document.querySelectorAll('.checklist-item').forEach(cb => {
+  cb.addEventListener('change', updateCounts);
+});
+updateCounts();
+</script>
+{% endblock %}

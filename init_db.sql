@@ -74,6 +74,23 @@ CREATE TABLE IF NOT EXISTS fuel_log (
     created_at       TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS trip_logs (
+    id                  SERIAL PRIMARY KEY,
+    res_id              INTEGER REFERENCES reservations(id) UNIQUE,
+    user_id             INTEGER REFERENCES users(id),
+    checkout_time       TIMESTAMP NOT NULL,
+    motor_hours_out     NUMERIC(8,1),
+    fuel_level_out      VARCHAR(20),   -- empty|quarter|half|three_quarters|full
+    condition_out       TEXT,
+    checklist_items     JSONB,         -- array of checked item indices, e.g. [0,1,3,5]
+    checkin_time        TIMESTAMP,
+    motor_hours_in      NUMERIC(8,1),
+    fuel_added_gallons  NUMERIC(6,2),
+    fuel_added_cost     NUMERIC(8,2),
+    condition_in        TEXT,
+    created_at          TIMESTAMP DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS waitlist (
     id           SERIAL PRIMARY KEY,
     user_id      INTEGER REFERENCES users(id),
@@ -88,6 +105,8 @@ CREATE INDEX IF NOT EXISTS idx_res_date       ON reservations(date);
 CREATE INDEX IF NOT EXISTS idx_res_user       ON reservations(user_id);
 CREATE INDEX IF NOT EXISTS idx_res_status     ON reservations(status);
 CREATE INDEX IF NOT EXISTS idx_blackout_start ON blackout_dates(start_time);
+CREATE INDEX IF NOT EXISTS idx_triplog_res    ON trip_logs(res_id);
+CREATE INDEX IF NOT EXISTS idx_triplog_user   ON trip_logs(user_id);
 
 -- First admin account: username=admin, password=changeme
 -- CHANGE THIS PASSWORD immediately after first login via Admin > Reset Password

@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Check In — Bentley Boat Club{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-6">
+
+    <div class="d-flex align-items-center mb-4">
+      <a href="{{ url_for('my_reservations') }}" class="btn btn-sm btn-outline-secondary me-3">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <div>
+        <h5 class="mb-0 fw-bold">
+          <i class="bi bi-box-arrow-in-left me-2 text-success"></i>Check In
+        </h5>
+        <div class="text-muted small">
+          {{ res.date.strftime('%A, %B %d, %Y') }}
+          &middot;
+          {{ res.start_time.strftime('%-I:%M %p') }}–{{ res.end_time.strftime('%-I:%M %p') }} CT
+        </div>
+      </div>
+    </div>
+
+    {# ---- Checkout Summary ---- #}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-receipt me-2 text-club-blue"></i>Checkout Summary
+      </div>
+      <div class="card-body p-4">
+        <div class="row g-3">
+          <div class="col-6">
+            <div class="text-muted small">Departed</div>
+            <div class="fw-semibold">
+              {% if trip_log.checkout_time %}
+                {{ trip_log.checkout_time.strftime('%-I:%M %p') }}
+              {% else %}—{% endif %}
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="text-muted small">Engine Hours Out</div>
+            <div class="fw-semibold">
+              {% if trip_log.motor_hours_out is not none %}
+                {{ "%.1f"|format(trip_log.motor_hours_out) }}
+              {% else %}—{% endif %}
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="text-muted small">Fuel Level</div>
+            <div>
+              {% if trip_log.fuel_level_out and trip_log.fuel_level_out in FUEL_LEVELS %}
+                {% set label, color = FUEL_LEVELS[trip_log.fuel_level_out] %}
+                <span class="badge bg-{{ color }} text-{{ 'dark' if color == 'warning' else 'white' }}">
+                  {{ label }}
+                </span>
+              {% else %}—{% endif %}
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="text-muted small">Condition Notes</div>
+            <div class="small">{{ trip_log.condition_out or '—' }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ---- Return Details ---- #}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-speedometer2 me-2 text-success"></i>Return Details
+      </div>
+      <div class="card-body p-4">
+        <form method="post" id="checkinForm">
+
+          <div class="mb-3">
+            <label class="form-label">Return Time <span class="text-danger">*</span></label>
+            <input type="time" class="form-control" name="checkin_time"
+                   value="{{ now_time }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Engine Hours (in) <small class="text-muted">(optional)</small></label>
+            <input type="number" class="form-control" name="motor_hours_in"
+                   id="hoursIn" min="0" step="0.1"
+                   placeholder="e.g. 127.2">
+            {% if trip_log.motor_hours_out is not none %}
+            <div class="form-text" id="hoursUsed"></div>
+            {% endif %}
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-6">
+              <label class="form-label">Fuel Added <small class="text-muted">(gal)</small></label>
+              <input type="number" class="form-control" name="fuel_added_gallons"
+                     id="gallons" min="0" step="0.01" placeholder="0.00">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Total Cost <small class="text-muted">(auto-calc)</small></label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input type="number" class="form-control" name="fuel_added_cost"
+                       id="fuelCost" min="0" step="0.01" placeholder="0.00">
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">Condition on Return <small class="text-muted">(optional)</small></label>
+            <textarea class="form-control" name="condition_in" rows="3"
+                      placeholder="Any damage, issues noticed, or general condition notes…"></textarea>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success">
+              <i class="bi bi-check2-circle me-1"></i>Complete Check-In
+            </button>
+            <a href="{{ url_for('my_reservations') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if trip_log.motor_hours_out is not none %}
+const hoursOut = {{ trip_log.motor_hours_out }};
+const hoursIn  = document.getElementById('hoursIn');
+const hoursUsed = document.getElementById('hoursUsed');
+
+hoursIn.addEventListener('input', function () {
+  const val = parseFloat(this.value);
+  if (!isNaN(val) && val >= hoursOut) {
+    hoursUsed.textContent = (val - hoursOut).toFixed(1) + ' hours used';
+    hoursUsed.className = 'form-text text-success';
+  } else if (!isNaN(val)) {
+    hoursUsed.textContent = 'Hours in must be ≥ hours out (' + hoursOut.toFixed(1) + ')';
+    hoursUsed.className = 'form-text text-danger';
+  } else {
+    hoursUsed.textContent = '';
+  }
+});
+{% endif %}
+</script>
+{% endblock %}

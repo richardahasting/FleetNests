@@ -598,6 +598,98 @@ def get_user_ical_reservations(user_id: int) -> list:
     )
 
 
+# ---------------------------------------------------------------------------
+# Trip logs
+# ---------------------------------------------------------------------------
+
+CAPTAIN_CHECKLIST = [
+    # Safety Equipment (indices 0-4)
+    "Life jackets / PFDs accessible for all aboard",
+    "Fire extinguisher charged and accessible",
+    "Distress signals (flares / whistle)",
+    "Horn or whistle",
+    "First aid kit stocked",
+    # Navigation & Docs (indices 5-7)
+    "Current registration on board",
+    "Navigation lights functional",
+    "Weather forecast checked",
+    # Engine & Mechanical (indices 8-11)
+    "Engine oil level checked",
+    "Engine starts and runs normally",
+    "Bilge pump operational",
+    "No fuel leaks or unusual odors",
+    # Before Departure (indices 12-16)
+    "Fuel level noted",
+    "Float plan left with someone ashore",
+    "Lines and fenders stowed",
+    "Passengers briefed on safety",
+    "Area clear — safe to depart",
+]
+
+CHECKLIST_CATEGORIES = [
+    ("Safety Equipment",    list(range(0, 5))),
+    ("Navigation & Docs",   list(range(5, 8))),
+    ("Engine & Mechanical", list(range(8, 12))),
+    ("Before Departure",    list(range(12, 17))),
+]
+
+FUEL_LEVELS = {
+    "empty":          ("Empty",    "danger"),
+    "quarter":        ("¼",        "warning"),
+    "half":           ("½",        "warning"),
+    "three_quarters": ("¾",        "success"),
+    "full":           ("Full",     "success"),
+}
+
+
+def get_trip_log(res_id: int):
+    return db.fetchone("SELECT * FROM trip_logs WHERE res_id = %s", (res_id,))
+
+
+def create_checkout(res_id: int, user_id: int, checkout_time,
+                    motor_hours_out, fuel_level_out: str,
+                    condition_out: str, checklist_items: list):
+    import json
+    return db.insert(
+        "INSERT INTO trip_logs "
+        "(res_id, user_id, checkout_time, motor_hours_out, fuel_level_out, "
+        " condition_out, checklist_items) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (res_id, user_id, checkout_time, motor_hours_out, fuel_level_out,
+         condition_out or None, json.dumps(checklist_items)),
+    )
+
+
+def update_checkin(res_id: int, checkin_time, motor_hours_in,
+                   fuel_added_gallons, fuel_added_cost, condition_in: str):
+    db.execute(
+        "UPDATE trip_logs SET checkin_time=%s, motor_hours_in=%s, "
+        "fuel_added_gallons=%s, fuel_added_cost=%s, condition_in=%s "
+        "WHERE res_id=%s",
+        (checkin_time, motor_hours_in, fuel_added_gallons or None,
+         fuel_added_cost or None, condition_in or None, res_id),
+        fetch=False,
+    )
+
+
+def get_all_trip_logs() -> list:
+    return db.execute(
+        "SELECT t.*, r.date AS res_date, r.start_time, r.end_time, "
+        "       u.full_name, u.username "
+        "FROM trip_logs t "
+        "JOIN reservations r ON r.id = t.res_id "
+        "JOIN users u ON u.id = t.user_id "
+        "ORDER BY t.checkout_time DESC"
+    )
+
+
+def get_trip_logs_for_user(user_id: int) -> list:
+    return db.execute(
+        "SELECT * FROM trip_logs WHERE user_id = %s",
+        (user_id,),
+    )
+
+
 def get_all_reservations_for_export(year: int = None) -> list:
     """Full reservation detail for CSV export."""
     if year:

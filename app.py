@@ -236,11 +236,15 @@ def register_routes(app: Flask):
         data = models.get_user_reservations(user["id"])
         waitlist = models.get_user_waitlist(user["id"])
         ical_token = models.get_or_create_ical_token(user["id"])
+        tlogs = models.get_trip_logs_for_user(user["id"])
+        trip_logs_map = {tlog["res_id"]: tlog for tlog in tlogs}
         return render_template("my_reservations.html",
                                upcoming=data["upcoming"],
                                past=data["past"],
                                waitlist=waitlist,
-                               ical_token=ical_token)
+                               ical_token=ical_token,
+                               trip_logs_map=trip_logs_map,
+                               today=date.today())
 
     # -- Stats -----------------------------------------------------------
 
@@ -620,6 +624,98 @@ def register_routes(app: Flask):
         user = auth.current_user()
         token = models.get_or_create_ical_token(user["id"])
         return render_template("ical_token.html", token=token)
+
+    # -- Trip Log (Checkout / Check-in) -----------------------------------
+
+    @app.route("/trips/<int:res_id>/checkout", methods=["GET", "POST"])
+    @auth.login_required
+    def trip_checkout(res_id: int):
+        user = auth.current_user()
+        res = models.get_reservation_by_id(res_id)
+        if not res:
+            abort(404)
+        if not user["is_admin"] and res["user_id"] != user["id"]:
+            abort(403)
+        if res["date"] != date.today():
+            flash("Check-out is only available on the day of your reservation.", "warning")
+            return redirect(url_for("my_reservations"))
+        trip_log = models.get_trip_log(res_id)
+        if trip_log:
+            flash("Check-out already recorded for this reservation.", "info")
+            return redirect(url_for("my_reservations"))
+
+        if request.method == "POST":
+            time_str    = request.form.get("checkout_time", "").strip()
+            hours_str   = request.form.get("motor_hours_out", "").strip()
+            fuel_level  = request.form.get("fuel_level_out", "").strip()
+            condition   = request.form.get("condition_out", "").strip()[:500]
+            checklist   = [int(x) for x in request.form.getlist("checklist") if x.isdigit()]
+            try:
+                checkout_dt = datetime.fromisoformat(f"{res['date'].isoformat()}T{time_str}")
+                hours_out   = float(hours_str) if hours_str else None
+                models.create_checkout(res_id, user["id"], checkout_dt,
+                                       hours_out, fuel_level or None, condition, checklist)
+                models.log_action(user["id"], "trip_checkout", "reservation", res_id,
+                                  {"fuel_level": fuel_level, "checklist_count": len(checklist)})
+                flash("Check-out recorded. Have a great trip!", "success")
+                return redirect(url_for("my_reservations"))
+            except (ValueError, KeyError) as ex:
+                flash(f"Invalid input: {ex}", "danger")
+
+        now_time = datetime.now(CENTRAL).strftime("%H:%M")
+        return render_template("checkout.html", res=res, trip_log=None,
+                               CAPTAIN_CHECKLIST=models.CAPTAIN_CHECKLIST,
+                               CHECKLIST_CATEGORIES=models.CHECKLIST_CATEGORIES,
+                               FUEL_LEVELS=models.FUEL_LEVELS,
+                               now_time=now_time)
+
+    @app.route("/trips/<int:res_id>/checkin", methods=["GET", "POST"])
+    @auth.login_required
+    def trip_checkin(res_id: int):
+        user = auth.current_user()
+        res = models.get_reservation_by_id(res_id)
+        if not res:
+            abort(404)
+        trip_log = models.get_trip_log(res_id)
+        if not trip_log:
+            flash("No check-out found for this reservation.", "warning")
+            return redirect(url_for("my_reservations"))
+        if not user["is_admin"] and trip_log["user_id"] != user["id"]:
+            abort(403)
+
+        if request.method == "POST":
+            time_str      = request.form.get("checkin_time", "").strip()
+            hours_str     = request.form.get("motor_hours_in", "").strip()
+            gallons_str   = request.form.get("fuel_added_gallons", "").strip()
+            cost_str      = request.form.get("fuel_added_cost", "").strip()
+            condition     = request.form.get("condition_in", "").strip()[:500]
+            try:
+                checkin_dt  = datetime.fromisoformat(f"{res['date'].isoformat()}T{time_str}")
+                hours_in    = float(hours_str) if hours_str else None
+                gallons     = float(gallons_str) if gallons_str else None
+                cost        = float(cost_str) if cost_str else None
+                models.update_checkin(res_id, checkin_dt, hours_in, gallons, cost, condition)
+                if gallons and gallons > 0:
+                    models.create_fuel_entry(user["id"], res_id, res["date"],
+                                             gallons, None, cost,
+                                             "Auto-logged from trip check-in")
+                models.log_action(user["id"], "trip_checkin", "reservation", res_id,
+                                  {"hours_in": hours_in, "fuel_gallons": gallons})
+                flash("Check-in complete. Welcome back!", "success")
+                return redirect(url_for("my_reservations"))
+            except (ValueError, KeyError) as ex:
+                flash(f"Invalid input: {ex}", "danger")
+
+        now_time = datetime.now(CENTRAL).strftime("%H:%M")
+        return render_template("checkin.html", res=res, trip_log=trip_log,
+                               FUEL_LEVELS=models.FUEL_LEVELS,
+                               now_time=now_time)
+
+    @app.route("/admin/trip-logs")
+    @auth.admin_required
+    def admin_trip_logs():
+        logs = models.get_all_trip_logs()
+        return render_template("admin/trip_logs.html", logs=logs)
 
 
 # ---------------------------------------------------------------------------
