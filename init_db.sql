@@ -3,17 +3,23 @@
 --   psql -U bentley_user -d bentley_boat -f init_db.sql
 
 CREATE TABLE IF NOT EXISTS users (
-    id                   SERIAL PRIMARY KEY,
-    username             VARCHAR(50) UNIQUE NOT NULL,
-    full_name            VARCHAR(100) NOT NULL,
-    email                VARCHAR(100),
-    password_hash        VARCHAR(255) NOT NULL,
-    is_admin             BOOLEAN DEFAULT FALSE,
-    is_active            BOOLEAN DEFAULT TRUE,
-    max_consecutive_days INTEGER DEFAULT 3,
-    max_pending          INTEGER DEFAULT 7,
-    ical_token           VARCHAR(64) UNIQUE,
-    created_at           TIMESTAMP DEFAULT NOW()
+    id                     SERIAL PRIMARY KEY,
+    username               VARCHAR(50) UNIQUE NOT NULL,
+    full_name              VARCHAR(100) NOT NULL,
+    email                  VARCHAR(100),
+    password_hash          VARCHAR(255) NOT NULL,
+    is_admin               BOOLEAN DEFAULT FALSE,
+    is_active              BOOLEAN DEFAULT TRUE,
+    max_consecutive_days   INTEGER DEFAULT 3,
+    max_pending            INTEGER DEFAULT 7,
+    ical_token             VARCHAR(64) UNIQUE,
+    phone                  VARCHAR(20),
+    pending_email          VARCHAR(100),
+    email_verify_token     VARCHAR(64) UNIQUE,
+    email_verify_expires   TIMESTAMP,
+    avatar                 BYTEA,
+    avatar_content_type    VARCHAR(50),
+    created_at             TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS reservations (
@@ -107,6 +113,16 @@ CREATE INDEX IF NOT EXISTS idx_res_status     ON reservations(status);
 CREATE INDEX IF NOT EXISTS idx_blackout_start ON blackout_dates(start_time);
 CREATE INDEX IF NOT EXISTS idx_triplog_res    ON trip_logs(res_id);
 CREATE INDEX IF NOT EXISTS idx_triplog_user   ON trip_logs(user_id);
+
+CREATE TABLE IF NOT EXISTS message_photos (
+    id           SERIAL PRIMARY KEY,
+    message_id   INTEGER REFERENCES messages(id) ON DELETE CASCADE,
+    photo_data   BYTEA NOT NULL,
+    content_type VARCHAR(50) NOT NULL DEFAULT 'image/jpeg',
+    filename     VARCHAR(200),
+    uploaded_at  TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_msgphoto_msg ON message_photos(message_id);
 
 -- First admin account: username=admin, password=changeme
 -- CHANGE THIS PASSWORD immediately after first login via Admin > Reset Password

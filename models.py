@@ -707,3 +707,85 @@ def get_all_reservations_for_export(year: int = None) -> list:
         "FROM reservations r JOIN users u ON u.id = r.user_id "
         "ORDER BY r.date, r.start_time"
     )
+
+
+# ---------------------------------------------------------------------------
+# Profile management
+# ---------------------------------------------------------------------------
+
+def update_profile(user_id: int, phone: str):
+    db.execute(
+        "UPDATE users SET phone = %s WHERE id = %s",
+        (phone or None, user_id),
+        fetch=False,
+    )
+
+
+def update_avatar(user_id: int, data: bytes, content_type: str):
+    db.execute(
+        "UPDATE users SET avatar = %s, avatar_content_type = %s WHERE id = %s",
+        (data, content_type, user_id),
+        fetch=False,
+    )
+
+
+def get_avatar(user_id: int):
+    return db.fetchone(
+        "SELECT avatar, avatar_content_type FROM users WHERE id = %s",
+        (user_id,),
+    )
+
+
+def initiate_email_change(user_id: int, new_email: str, token: str, expires):
+    db.execute(
+        "UPDATE users SET pending_email = %s, email_verify_token = %s, "
+        "email_verify_expires = %s WHERE id = %s",
+        (new_email, token, expires, user_id),
+        fetch=False,
+    )
+
+
+def confirm_email_change(token: str):
+    """Find a pending email change by token, validate expiry, apply it.
+    Returns the updated user row on success, None if invalid or expired."""
+    row = db.fetchone(
+        "SELECT * FROM users WHERE email_verify_token = %s AND is_active = TRUE",
+        (token,),
+    )
+    if not row:
+        return None
+    if row["email_verify_expires"] and now_ct() > row["email_verify_expires"]:
+        return None
+    db.execute(
+        "UPDATE users SET email = pending_email, pending_email = NULL, "
+        "email_verify_token = NULL, email_verify_expires = NULL WHERE id = %s",
+        (row["id"],),
+        fetch=False,
+    )
+    return row
+
+
+# ---------------------------------------------------------------------------
+# Message photos
+# ---------------------------------------------------------------------------
+
+def get_message_photos(message_id: int) -> list:
+    return db.execute(
+        "SELECT id, content_type, filename FROM message_photos WHERE message_id = %s ORDER BY id",
+        (message_id,),
+    )
+
+
+def get_message_photo_data(photo_id: int):
+    return db.fetchone(
+        "SELECT photo_data, content_type FROM message_photos WHERE id = %s",
+        (photo_id,),
+    )
+
+
+def add_message_photo(message_id: int, data: bytes, content_type: str, filename: str):
+    return db.insert(
+        "INSERT INTO message_photos (message_id, photo_data, content_type, filename) "
+        "VALUES (%s, %s, %s, %s) RETURNING id",
+        (message_id, data, content_type, filename or None),
+    )

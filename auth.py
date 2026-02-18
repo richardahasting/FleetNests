@@ -83,11 +83,12 @@ def admin_required(f):
 # DB-backed auth
 # ---------------------------------------------------------------------------
 
-def authenticate(username: str, password: str) -> dict | None:
-    """Return the user row if credentials are valid and account is active."""
+def authenticate(login: str, password: str) -> dict | None:
+    """Return the user row if credentials are valid and account is active.
+    Accepts either username or email address as the login identifier."""
     row = db.fetchone(
-        "SELECT * FROM users WHERE username = %s AND is_active = TRUE",
-        (username,),
+        "SELECT * FROM users WHERE (username = %s OR email = %s) AND is_active = TRUE",
+        (login, login),
     )
     if row and check_password(password, row["password_hash"]):
         return row

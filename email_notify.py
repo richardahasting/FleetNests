@@ -97,6 +97,20 @@ def notify_approval_needed(admins: list, user: dict, res: dict):
             )
 
 
+def notify_email_verify(user: dict, new_email: str, token: str) -> bool:
+    """Send email verification link to the NEW address the member wants to switch to."""
+    return send_email(
+        new_email,
+        "Verify your new email — Bentley Boat Club",
+        f"Hi {user['full_name']},\n\n"
+        f"You requested to change your Bentley Boat Club email address to this one.\n\n"
+        f"Click the link below to confirm (expires in 24 hours):\n\n"
+        f"  {APP_URL}/verify-email/{token}\n\n"
+        f"If you did not request this, ignore this email. Your current address is unchanged.\n\n"
+        f"— Bentley Boat Club",
+    )
+
+
 def notify_waitlist_available(user: dict, desired_date) -> bool:
     """Notify a waitlisted member that their desired date is now open."""
     if not user.get("email"):

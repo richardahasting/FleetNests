@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}My Profile — Bentley Boat Club{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-7 col-lg-5">
+
+    <div class="d-flex align-items-center mb-4">
+      <a href="{{ url_for('calendar') }}" class="btn btn-sm btn-outline-secondary me-3">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <h5 class="mb-0 fw-bold">
+        <i class="bi bi-person-gear me-2 text-club-blue"></i>My Profile
+      </h5>
+    </div>
+
+    {# ---- Profile Photo ---- #}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-camera me-2 text-club-blue"></i>Profile Photo
+      </div>
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center gap-4 mb-3">
+          {% if user.avatar %}
+          <img src="{{ url_for('profile_photo', user_id=user.id) }}"
+               alt="{{ user.full_name }}"
+               class="rounded-circle border"
+               style="width:80px;height:80px;object-fit:cover">
+          {% else %}
+          <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center"
+               style="width:80px;height:80px;flex-shrink:0">
+            <i class="bi bi-person-fill text-white" style="font-size:2rem"></i>
+          </div>
+          {% endif %}
+          <form method="post" enctype="multipart/form-data" class="flex-grow-1">
+            <input type="hidden" name="action" value="avatar">
+            <div class="mb-2">
+              <input type="file" class="form-control form-control-sm" name="avatar"
+                     accept="image/*" required>
+              <div class="form-text">Max 5 MB</div>
+            </div>
+            <button type="submit" class="btn btn-sm btn-club-blue">
+              <i class="bi bi-upload me-1"></i>Upload
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    {# ---- Personal Info ---- #}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-person me-2 text-club-blue"></i>Personal Info
+      </div>
+      <div class="card-body p-4">
+        <form method="post">
+          <input type="hidden" name="action" value="profile">
+
+          <div class="mb-3">
+            <label class="form-label text-muted small">Full Name</label>
+            <div class="form-control-plaintext">{{ user.full_name }}</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label text-muted small">Username</label>
+            <div class="form-control-plaintext text-muted">{{ user.username }}</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label text-muted small">Email</label>
+            <div class="form-control-plaintext">
+              {{ user.email or '—' }}
+              {% if user.pending_email %}
+              <span class="badge bg-warning text-dark ms-2">
+                <i class="bi bi-hourglass-split me-1"></i>Pending: {{ user.pending_email }}
+              </span>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="phone">Phone</label>
+            <input type="tel" class="form-control" id="phone" name="phone"
+                   value="{{ user.phone or '' }}" maxlength="20"
+                   placeholder="e.g. 555-867-5309">
+          </div>
+
+          <button type="submit" class="btn btn-club-blue">
+            <i class="bi bi-save me-1"></i>Save
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {# ---- Change Email ---- #}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-envelope me-2 text-club-blue"></i>Change Email
+      </div>
+      <div class="card-body p-4">
+        {% if user.pending_email %}
+        <div class="alert alert-warning py-2 small mb-3">
+          <i class="bi bi-hourglass-split me-1"></i>
+          A verification email was sent to <strong>{{ user.pending_email }}</strong>.
+          Click the link in that email to confirm the change.
+          Your current email is unchanged until then.
+        </div>
+        {% endif %}
+        <form method="post">
+          <input type="hidden" name="action" value="email">
+          <div class="mb-3">
+            <label class="form-label" for="new_email">New Email Address</label>
+            <input type="email" class="form-control" id="new_email" name="new_email"
+                   placeholder="new@example.com" required
+                   {% if user.pending_email %}disabled{% endif %}>
+            <div class="form-text">
+              A verification link will be sent to the new address. Your current email
+              remains active until you click the link.
+            </div>
+          </div>
+          <button type="submit" class="btn btn-club-blue"
+                  {% if user.pending_email %}disabled{% endif %}>
+            <i class="bi bi-send me-1"></i>Send Verification
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {# ---- Change Password ---- #}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-lock me-2 text-club-blue"></i>Change Password
+      </div>
+      <div class="card-body p-4">
+        <form method="post">
+          <input type="hidden" name="action" value="password">
+
+          <div class="mb-3">
+            <label class="form-label" for="current_password">Current Password</label>
+            <input type="password" class="form-control" id="current_password"
+                   name="current_password" required autocomplete="current-password">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="new_password">New Password</label>
+            <input type="password" class="form-control" id="new_password"
+                   name="new_password" required minlength="8" autocomplete="new-password">
+            <div class="form-text">Minimum 8 characters.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="confirm_password">Confirm New Password</label>
+            <input type="password" class="form-control" id="confirm_password"
+                   name="confirm_password" required autocomplete="new-password">
+          </div>
+
+          <button type="submit" class="btn btn-club-blue">
+            <i class="bi bi-key me-1"></i>Change Password
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

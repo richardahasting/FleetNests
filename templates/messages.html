@@ -30,6 +30,18 @@
           {% endif %}
         </div>
         <p class="card-text mt-2 mb-1" style="white-space:pre-wrap">{{ msg.body }}</p>
+        {% set photos = message_photos_map.get(msg.id, []) %}
+        {% if photos %}
+        <div class="d-flex flex-wrap gap-2 mt-2 mb-2">
+          {% for photo in photos %}
+          <a href="{{ url_for('message_photo', photo_id=photo.id) }}" target="_blank">
+            <img src="{{ url_for('message_photo', photo_id=photo.id) }}"
+                 alt="{{ photo.filename or 'photo' }}"
+                 style="max-height:160px;max-width:200px;object-fit:cover;border-radius:6px;border:1px solid #dee2e6">
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
         <small class="text-muted">
           {{ msg.full_name }} · {{ msg.created_at.strftime('%b %d, %Y %I:%M %p') }}
         </small>

@@ -18,6 +18,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from zoneinfo import ZoneInfo
 
 import auth
+import db
 import models
 import email_notify
 
@@ -260,7 +261,9 @@ def register_routes(app: Flask):
     @auth.login_required
     def messages():
         msgs = models.get_messages()
-        return render_template("messages.html", messages=msgs)
+        message_photos_map = {msg["id"]: models.get_message_photos(msg["id"]) for msg in msgs}
+        return render_template("messages.html", messages=msgs,
+                               message_photos_map=message_photos_map)
 
     @app.route("/messages/new", methods=["GET", "POST"])
     @auth.login_required
@@ -273,7 +276,21 @@ def register_routes(app: Flask):
             if not title or not body:
                 flash("Title and body are required.", "danger")
             else:
-                models.create_message(user["id"], title, body, is_ann)
+                result = models.create_message(user["id"], title, body, is_ann)
+                if result:
+                    msg_id = result["id"]
+                    photos = request.files.getlist("photos")
+                    saved = 0
+                    for f in photos[:5]:
+                        if not f or not f.filename:
+                            continue
+                        if not f.content_type.startswith("image/"):
+                            continue
+                        data = f.read()
+                        if len(data) > 5 * 1024 * 1024:
+                            continue
+                        models.add_message_photo(msg_id, data, f.content_type, f.filename)
+                        saved += 1
                 flash("Message posted.", "success")
                 return redirect(url_for("messages"))
         return render_template("message_form.html")
@@ -624,6 +641,114 @@ def register_routes(app: Flask):
         user = auth.current_user()
         token = models.get_or_create_ical_token(user["id"])
         return render_template("ical_token.html", token=token)
+
+    # -- Profile ----------------------------------------------------------
+
+    @app.route("/profile", methods=["GET", "POST"])
+    @auth.login_required
+    def profile():
+        from flask import Response
+        user_session = auth.current_user()
+        user = models.get_user_by_id(user_session["id"])
+
+        if request.method == "POST":
+            action = request.form.get("action", "")
+
+            if action == "profile":
+                phone = request.form.get("phone", "").strip()[:20]
+                models.update_profile(user["id"], phone)
+                flash("Profile updated.", "success")
+
+            elif action == "avatar":
+                f = request.files.get("avatar")
+                if not f or not f.filename:
+                    flash("Please choose an image file.", "danger")
+                elif not f.content_type.startswith("image/"):
+                    flash("Only image files are allowed.", "danger")
+                else:
+                    data = f.read()
+                    if len(data) > 5 * 1024 * 1024:
+                        flash("Image must be 5 MB or smaller.", "danger")
+                    else:
+                        models.update_avatar(user["id"], data, f.content_type)
+                        flash("Profile photo updated.", "success")
+
+            elif action == "email":
+                import secrets
+                new_email = request.form.get("new_email", "").strip().lower()
+                if not new_email or "@" not in new_email:
+                    flash("Enter a valid email address.", "danger")
+                elif new_email == user.get("email", ""):
+                    flash("That's already your current email.", "warning")
+                else:
+                    existing = models.get_user_by_id(user["id"])
+                    # Check not taken by another user
+                    taken = db.fetchone(
+                        "SELECT id FROM users WHERE (email = %s OR username = %s) AND id != %s",
+                        (new_email, new_email, user["id"]),
+                    )
+                    if taken:
+                        flash("That email is already in use.", "danger")
+                    else:
+                        token = secrets.token_urlsafe(32)
+                        expires = models.now_ct() + timedelta(hours=24)
+                        models.initiate_email_change(user["id"], new_email, token, expires)
+                        email_notify.notify_email_verify(user, new_email, token)
+                        flash(f"Verification email sent to {new_email}. "
+                              "Click the link within 24 hours to confirm.", "info")
+
+            elif action == "password":
+                current_pw = request.form.get("current_password", "")
+                new_pw     = request.form.get("new_password", "")
+                confirm_pw = request.form.get("confirm_password", "")
+                full_user  = db.fetchone("SELECT password_hash FROM users WHERE id = %s",
+                                         (user["id"],))
+                if not auth.check_password(current_pw, full_user["password_hash"]):
+                    flash("Current password is incorrect.", "danger")
+                elif len(new_pw) < 8:
+                    flash("New password must be at least 8 characters.", "danger")
+                elif new_pw != confirm_pw:
+                    flash("Passwords do not match.", "danger")
+                else:
+                    models.update_password(user["id"], auth.hash_password(new_pw))
+                    models.log_action(user["id"], "password_changed", "user", user["id"])
+                    flash("Password changed successfully.", "success")
+
+            return redirect(url_for("profile"))
+
+        user = models.get_user_by_id(user_session["id"])
+        return render_template("profile.html", user=user)
+
+    @app.route("/profile/photo/<int:user_id>")
+    @auth.login_required
+    def profile_photo(user_id: int):
+        from flask import Response
+        row = models.get_avatar(user_id)
+        if not row or not row["avatar"]:
+            abort(404)
+        return Response(bytes(row["avatar"]),
+                        mimetype=row["avatar_content_type"] or "image/jpeg",
+                        headers={"Cache-Control": "max-age=3600"})
+
+    @app.route("/verify-email/<token>")
+    def verify_email(token: str):
+        user = models.confirm_email_change(token)
+        if not user:
+            flash("That verification link is invalid or has expired.", "danger")
+            return redirect(url_for("login"))
+        flash("Email address verified. Please log in with your new email.", "success")
+        auth.logout_user()
+        return redirect(url_for("login"))
+
+    @app.route("/messages/photo/<int:photo_id>")
+    @auth.login_required
+    def message_photo(photo_id: int):
+        from flask import Response
+        row = models.get_message_photo_data(photo_id)
+        if not row or not row["photo_data"]:
+            abort(404)
+        return Response(bytes(row["photo_data"]),
+                        mimetype=row["content_type"] or "image/jpeg")
 
     # -- Trip Log (Checkout / Check-in) -----------------------------------
 
