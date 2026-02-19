@@ -3,18 +3,18 @@ AI-routed member feedback for Bentley Boat Club.
 
 process_feedback(user, text, image_bytes, image_content_type) -> (bool, str)
 
-Routes via Claude Haiku:
-- Bugs / feature requests  → GitHub issue (create_github_issue tool)
-- Everything else          → email to FEEDBACK_EMAIL (send_email tool)
-- No ANTHROPIC_API_KEY     → fallback plain email, no crash
-- Claude error             → fallback plain email, no crash
-- No GITHUB_TOKEN          → returns (False, "github_issue") — 500 to client
+Routes via the `claude` CLI (no ANTHROPIC_API_KEY needed in the app):
+- Bugs / feature requests  → GitHub issue
+- Everything else          → email to FEEDBACK_EMAIL
+- claude CLI not found     → fallback plain email, no crash
+- Any error                → fallback plain email, no crash
 """
 
-import base64
 import json
 import logging
 import os
+import subprocess
+import tempfile
 import urllib.error
 import urllib.request
 
@@ -22,69 +22,35 @@ log = logging.getLogger(__name__)
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
-_SYSTEM_PROMPT = """\
+_IMAGE_EXTENSIONS = {
+    "image/jpeg": ".jpg",
+    "image/png":  ".png",
+    "image/gif":  ".gif",
+    "image/webp": ".webp",
+}
+
+_PROMPT = """\
 You are the feedback assistant for Bentley Boat Club, a private boating club.
-A logged-in member has submitted feedback through the app. Your job is to triage
-it and route it to the right place by calling exactly one tool.
+A logged-in member has submitted feedback through the app. Triage it and decide
+where to route it.
 
 Rules:
-- Call create_github_issue for: bugs, broken features, UI glitches, error messages,
+- Route to github_issue for: bugs, broken features, UI glitches, error messages,
   performance problems, or feature requests / suggestions to improve the app.
-- Call send_email for: general comments, questions, praise, "thanks", concerns about
+- Route to email for: general comments, questions, praise, thanks, concerns about
   club policy, or anything that is not a software bug or feature request.
-- Be concise but include all relevant context in the issue/email body.
-- If a screenshot is attached, describe what it shows and include that in the body.
+- Be concise but include all relevant context in the title/body.
 - Always attribute the feedback to the member by name in the body.
-- Do not invent details not present in the feedback.
-- Respond ONLY with a tool call — no explanatory text.\
-"""
+- If a screenshot is referenced, note what it shows.
 
-_TOOLS = [
-    {
-        "name": "create_github_issue",
-        "description": (
-            "File a GitHub issue for bugs, broken features, UI glitches, "
-            "error messages, performance problems, or feature requests."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "Short descriptive title for the issue",
-                },
-                "body": {
-                    "type": "string",
-                    "description": "Full issue body with details and member attribution",
-                },
-                "labels": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Labels to apply: 'bug' or 'enhancement'",
-                },
-            },
-            "required": ["title", "body", "labels"],
-        },
-    },
-    {
-        "name": "send_email",
-        "description": (
-            "Send an email for general feedback, questions, praise, "
-            "or non-technical concerns."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "subject": {"type": "string", "description": "Email subject"},
-                "body": {
-                    "type": "string",
-                    "description": "Email body with feedback and member attribution",
-                },
-            },
-            "required": ["subject", "body"],
-        },
-    },
-]
+Output ONLY a single JSON object — no other text, no markdown fences.
+
+For bugs / feature requests:
+{"action":"github_issue","title":"<short title>","body":"<full body>","labels":["bug"|"enhancement"]}
+
+For everything else:
+{"action":"email","subject":"<subject>","body":"<full body>"}
+"""
 
 
 # ---------------------------------------------------------------------------
@@ -97,94 +63,89 @@ def process_feedback(
     image_bytes: bytes | None,
     image_content_type: str | None,
 ) -> tuple[bool, str]:
-    """Triage and route member feedback via Claude Haiku.
+    """Triage and route member feedback via the claude CLI.
 
     Returns (success, action) where action is one of:
       "github_issue", "email", "fallback_email"
     """
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        log.warning("ANTHROPIC_API_KEY not set; using fallback email for feedback")
-        return _fallback_email(user, text, image_bytes)
-
     try:
-        tool_use = _call_claude(api_key, user, text, image_bytes, image_content_type)
+        result = _call_claude_cli(user, text, image_bytes, image_content_type)
     except Exception as exc:
-        log.error("Claude API error in process_feedback: %s", exc)
-        return _fallback_email(user, text, image_bytes)
+        log.error("claude CLI error in process_feedback: %s", exc)
+        return _fallback_email(user, text)
 
-    tool_name = tool_use["name"]
-    inp = tool_use["input"]
+    action = result.get("action")
 
-    if tool_name == "create_github_issue":
-        ok = _create_github_issue(inp["title"], inp["body"], inp.get("labels", []))
+    if action == "github_issue":
+        ok = _create_github_issue(result["title"], result["body"], result.get("labels", []))
         if ok:
             return True, "github_issue"
-        # GitHub unavailable — fall back to email so feedback isn't lost
-        log.warning("GitHub issue creation failed; falling back to email for: %s", inp["title"])
-        ok = _send_email(f"[Feature/Bug] {inp['title']}", inp["body"])
+        log.warning("GitHub issue creation failed; falling back to email for: %s", result["title"])
+        ok = _send_email(f"[Feature/Bug] {result['title']}", result["body"])
         return ok, "fallback_email"
 
-    if tool_name == "send_email":
-        ok = _send_email(inp["subject"], inp["body"])
+    if action == "email":
+        ok = _send_email(result["subject"], result["body"])
         return ok, "email"
 
-    log.warning("Unexpected tool name from Claude: %s; falling back to email", tool_name)
-    return _fallback_email(user, text, image_bytes)
+    log.warning("Unexpected action from claude CLI: %s; falling back to email", action)
+    return _fallback_email(user, text)
 
 
 # ---------------------------------------------------------------------------
-# Claude API call
+# claude CLI call
 # ---------------------------------------------------------------------------
 
-def _call_claude(
-    api_key: str,
+def _call_claude_cli(
     user: dict,
     text: str,
     image_bytes: bytes | None,
     image_content_type: str | None,
 ) -> dict:
-    """Call Claude Haiku with tool_choice=any; return the tool_use block as a dict."""
+    """Invoke the claude CLI and return parsed JSON routing decision."""
+    image_path = None
     try:
-        import anthropic
-    except ImportError:
-        raise RuntimeError("anthropic package not installed — run: pip install anthropic")
+        # Write image to a temp file so claude can read it
+        if image_bytes and image_content_type in ALLOWED_IMAGE_TYPES:
+            ext = _IMAGE_EXTENSIONS.get(image_content_type, ".jpg")
+            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as f:
+                f.write(image_bytes)
+                image_path = f.name
 
-    client = anthropic.Anthropic(api_key=api_key)
-
-    content: list = []
-    if image_bytes and image_content_type in ALLOWED_IMAGE_TYPES:
-        content.append({
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": image_content_type,
-                "data": base64.b64encode(image_bytes).decode(),
-            },
-        })
-
-    content.append({
-        "type": "text",
-        "text": (
+        message = (
             f"Member: {user['full_name']} ({user.get('email', 'unknown')})\n\n"
             f"Feedback:\n{text}"
-        ),
-    })
+        )
+        if image_path:
+            message += f"\n\nScreenshot: {image_path}"
 
-    response = client.messages.create(
-        model="claude-haiku-4-5",
-        max_tokens=1024,
-        system=_SYSTEM_PROMPT,
-        tools=_TOOLS,
-        tool_choice={"type": "any"},
-        messages=[{"role": "user", "content": content}],
-    )
+        claude_bin = os.environ.get("CLAUDE_BIN", "/home/richard/.local/bin/claude")
+        # Remove CLAUDECODE so nested-session detection doesn't block us
+        env = os.environ.copy()
+        env.pop("CLAUDECODE", None)
+        result = subprocess.run(
+            [claude_bin, "-p", _PROMPT],
+            input=message,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=env,
+        )
 
-    for block in response.content:
-        if block.type == "tool_use":
-            return {"name": block.name, "input": block.input}
+        if result.returncode != 0:
+            raise RuntimeError(f"claude exited {result.returncode}: {result.stderr.strip()}")
 
-    raise ValueError("Claude returned no tool_use block despite tool_choice=any")
+        output = result.stdout.strip()
+        # Strip any accidental markdown fences
+        if output.startswith("```"):
+            output = output.split("```")[1]
+            if output.startswith("json"):
+                output = output[4:]
+        return json.loads(output)
+
+    finally:
+        if image_path and os.path.exists(image_path):
+            os.unlink(image_path)
 
 
 # ---------------------------------------------------------------------------
@@ -193,9 +154,9 @@ def _call_claude(
 
 def _create_github_issue(title: str, body: str, labels: list) -> bool:
     token = os.environ.get("GITHUB_TOKEN")
-    repo  = os.environ.get("GITHUB_REPO", "hastingtx/bentley-boat")
+    repo  = os.environ.get("GITHUB_REPO", "richardahasting/bentley-boat")
     if not token:
-        log.error("GITHUB_TOKEN not set; cannot create GitHub issue titled: %s", title)
+        log.error("GITHUB_TOKEN not set; cannot create GitHub issue: %s", title)
         return False
 
     payload = json.dumps({"title": title, "body": body, "labels": labels}).encode()
@@ -213,10 +174,7 @@ def _create_github_issue(title: str, body: str, labels: list) -> bool:
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            if resp.status in (200, 201):
-                return True
-            log.error("GitHub API returned unexpected status %s", resp.status)
-            return False
+            return resp.status in (200, 201)
     except urllib.error.HTTPError as exc:
         log.error("GitHub API HTTP %s: %s", exc.code, exc.read())
         return False
@@ -235,17 +193,12 @@ def _send_email(subject: str, body: str) -> bool:
     return email_notify.send_email(to_addr, subject, body)
 
 
-def _fallback_email(
-    user: dict, text: str, image_bytes: bytes | None
-) -> tuple[bool, str]:
-    """Send a plain email when Claude is unavailable."""
+def _fallback_email(user: dict, text: str) -> tuple[bool, str]:
+    """Send a plain email when the claude CLI is unavailable."""
     subject = f"Member Feedback from {user['full_name']}"
     body = (
         f"Feedback submitted by {user['full_name']} ({user.get('email', 'unknown')})\n\n"
         f"{text}"
     )
-    if image_bytes:
-        body += "\n\n[A screenshot was attached but could not be processed — Claude unavailable]"
-
     ok = _send_email(subject, body)
     return ok, "fallback_email"
