@@ -118,9 +118,10 @@ def register_routes(app: Flask):
 
         rows = models.get_reservations_range(start, end)
         user = auth.current_user()
+        eff_id = models.get_effective_user_id(user)
         events = []
         for row in rows:
-            mine = (row["user_id"] == user["id"])
+            mine = (row["user_id"] == eff_id)
             is_pending = (row["status"] == "pending_approval")
             color = "#ffc107" if is_pending else ("#0d6efd" if mine else "#6c757d")
             text_color = "#000000" if is_pending else "#ffffff"
@@ -162,6 +163,7 @@ def register_routes(app: Flask):
             abort(404)
 
         user = auth.current_user()
+        eff_id = models.get_effective_user_id(user)
         existing = models.get_reservations_for_date(day)
 
         if request.method == "POST":
@@ -174,18 +176,18 @@ def register_routes(app: Flask):
             except ValueError:
                 flash("Invalid time format.", "danger")
                 user_res_ids = {r["user_id"] for r in existing}
-                on_waitlist  = models.is_on_waitlist(user["id"], day)
+                on_waitlist  = models.is_on_waitlist(eff_id, day)
                 return render_template("reserve.html", day=day, existing=existing, today=date.today(),
-                                       user_has_res=user["id"] in user_res_ids,
+                                       user_has_res=eff_id in user_res_ids,
                                        on_waitlist=on_waitlist)
 
-            error = models.validate_reservation(user["id"], start_dt, end_dt)
+            error = models.validate_reservation(eff_id, start_dt, end_dt)
             if error:
                 flash(error, "danger")
             else:
                 approval = app.config.get("APPROVAL_REQUIRED", False)
                 status_after = "pending_approval" if approval else "active"
-                result = models.make_reservation(user["id"], start_dt, end_dt, notes=notes,
+                result = models.make_reservation(eff_id, start_dt, end_dt, notes=notes,
                                                  status=status_after)
                 models.log_action(user["id"], "reservation_created", "reservation",
                                   result["id"] if result else None,
@@ -203,17 +205,18 @@ def register_routes(app: Flask):
                 return redirect(url_for("calendar"))
 
         user_res_ids = {r["user_id"] for r in existing}
-        on_waitlist  = models.is_on_waitlist(user["id"], day)
+        on_waitlist  = models.is_on_waitlist(eff_id, day)
         return render_template("reserve.html", day=day, existing=existing, today=date.today(),
-                               user_has_res=user["id"] in user_res_ids,
+                               user_has_res=eff_id in user_res_ids,
                                on_waitlist=on_waitlist)
 
     @app.route("/cancel/<int:res_id>", methods=["POST"])
     @auth.login_required
     def cancel_reservation(res_id: int):
         user = auth.current_user()
+        eff_id = models.get_effective_user_id(user)
         res = models.get_reservation_by_id(res_id)
-        ok = models.cancel_reservation(res_id, user["id"], is_admin=user["is_admin"])
+        ok = models.cancel_reservation(res_id, eff_id, is_admin=user["is_admin"])
         if ok and res:
             day = res["date"].strftime("%B %d, %Y")
             flash(f"Reservation for {day} cancelled.", "success")
@@ -241,10 +244,11 @@ def register_routes(app: Flask):
     @auth.login_required
     def my_reservations():
         user = auth.current_user()
-        data = models.get_user_reservations(user["id"])
-        waitlist = models.get_user_waitlist(user["id"])
-        ical_token = models.get_or_create_ical_token(user["id"])
-        tlogs = models.get_trip_logs_for_user(user["id"])
+        eff_id = models.get_effective_user_id(user)
+        data = models.get_user_reservations(eff_id)
+        waitlist = models.get_user_waitlist(eff_id)
+        ical_token = models.get_or_create_ical_token(eff_id)
+        tlogs = models.get_trip_logs_for_user(eff_id)
         trip_logs_map = {tlog["res_id"]: tlog for tlog in tlogs}
         today = date.today()
         return render_template("my_reservations.html",
@@ -590,12 +594,13 @@ def register_routes(app: Flask):
     @auth.login_required
     def waitlist_join(res_date: str):
         user = auth.current_user()
+        eff_id = models.get_effective_user_id(user)
         try:
             day = date.fromisoformat(res_date)
         except ValueError:
             abort(404)
         notes = request.form.get("notes", "").strip()[:300]
-        models.add_to_waitlist(user["id"], day, notes)
+        models.add_to_waitlist(eff_id, day, notes)
         flash(f"You're on the waitlist for {day.strftime('%B %d')}. "
               "We'll email you if a spot opens.", "info")
         return redirect(url_for("reserve_detail", res_date=res_date))
@@ -604,11 +609,12 @@ def register_routes(app: Flask):
     @auth.login_required
     def waitlist_leave(res_date: str):
         user = auth.current_user()
+        eff_id = models.get_effective_user_id(user)
         try:
             day = date.fromisoformat(res_date)
         except ValueError:
             abort(404)
-        models.remove_from_waitlist(user["id"], day)
+        models.remove_from_waitlist(eff_id, day)
         flash("Removed from waitlist.", "info")
         return redirect(url_for("reserve_detail", res_date=res_date))
 
@@ -776,10 +782,11 @@ def register_routes(app: Flask):
     @auth.login_required
     def trip_checkout(res_id: int):
         user = auth.current_user()
+        eff_id = models.get_effective_user_id(user)
         res = models.get_reservation_by_id(res_id)
         if not res:
             abort(404)
-        if not user["is_admin"] and res["user_id"] != user["id"]:
+        if not user["is_admin"] and res["user_id"] != eff_id:
             abort(403)
         if res["date"] != date.today():
             flash("Check-out is only available on the day of your reservation.", "warning")
@@ -820,6 +827,7 @@ def register_routes(app: Flask):
     @auth.login_required
     def trip_checkin(res_id: int):
         user = auth.current_user()
+        eff_id = models.get_effective_user_id(user)
         res = models.get_reservation_by_id(res_id)
         if not res:
             abort(404)
@@ -827,7 +835,7 @@ def register_routes(app: Flask):
         if not trip_log:
             flash("No check-out found for this reservation.", "warning")
             return redirect(url_for("my_reservations"))
-        if not user["is_admin"] and trip_log["user_id"] != user["id"]:
+        if not user["is_admin"] and trip_log["user_id"] != eff_id:
             abort(403)
 
         if request.method == "POST":
@@ -864,6 +872,33 @@ def register_routes(app: Flask):
         logs = models.get_all_trip_logs()
         return render_template("admin/trip_logs.html", logs=logs)
 
+    @app.route("/admin/feedback")
+    @auth.admin_required
+    def admin_feedback():
+        submissions = models.get_all_feedback_submissions()
+        return render_template("admin/feedback.html", submissions=submissions)
+
+    @app.route("/admin/users/<int:user_id>/edit", methods=["GET", "POST"])
+    @auth.admin_required
+    def admin_edit_user(user_id: int):
+        target = models.get_user_by_id(user_id)
+        if not target:
+            abort(404)
+        all_users = models.get_all_active_users()
+        if request.method == "POST":
+            display_name     = request.form.get("display_name", "").strip()
+            family_str       = request.form.get("family_account_id", "").strip()
+            family_account_id = int(family_str) if family_str.isdigit() else None
+            # Prevent circular family links
+            if family_account_id == user_id:
+                family_account_id = None
+            models.update_user_profile(user_id, display_name or None, family_account_id)
+            models.log_action(auth.current_user()["id"], "user_profile_updated", "user", user_id,
+                              {"display_name": display_name, "family_account_id": family_account_id})
+            flash(f"Profile updated for {target['full_name']}.", "success")
+            return redirect(url_for("admin_users"))
+        return render_template("admin/edit_user.html", target=target, all_users=all_users)
+
     # -- Club Rules & Captain's Checklist -------------------------------------
 
     @app.route("/rules")
@@ -883,6 +918,65 @@ def register_routes(app: Flask):
                                MARINA_PHONE=models.MARINA_PHONE,
                                DISCLAIMER=models.CAPTAIN_CHECKLIST_DISCLAIMER)
 
+    # -- Monthly Statements ---------------------------------------------------
+
+    @app.route("/statements")
+    @auth.login_required
+    def statements():
+        stmts = models.get_all_statements()
+        return render_template("statements.html", statements=stmts)
+
+    @app.route("/statements/<int:stmt_id>/download")
+    @auth.login_required
+    def download_statement(stmt_id: int):
+        stmt = models.get_statement_by_id(stmt_id)
+        if not stmt:
+            abort(404)
+        from flask import Response
+        return Response(
+            bytes(stmt["file_data"]),
+            mimetype="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{stmt["filename"]}"'},
+        )
+
+    @app.route("/admin/statements", methods=["GET", "POST"])
+    @auth.statements_manager_required
+    def admin_statements():
+        if request.method == "POST":
+            action = request.form.get("action")
+            if action == "delete":
+                stmt_id = int(request.form.get("stmt_id", 0))
+                models.delete_statement(stmt_id)
+                models.log_action(auth.current_user()["id"], "statement_deleted", "statement", stmt_id)
+                flash("Statement deleted.", "success")
+                return redirect(url_for("admin_statements"))
+
+            display_name = request.form.get("display_name", "").strip()
+            f = request.files.get("pdf_file")
+            if not display_name:
+                flash("Please enter a name for the statement.", "danger")
+            elif not f or not f.filename:
+                flash("Please select a PDF file.", "danger")
+            elif f.content_type not in ("application/pdf", "application/octet-stream") and \
+                 not f.filename.lower().endswith(".pdf"):
+                flash("Only PDF files are allowed.", "danger")
+            else:
+                data = f.read()
+                if len(data) > 20 * 1024 * 1024:
+                    flash("File too large — maximum is 20 MB.", "danger")
+                else:
+                    import os
+                    filename = os.path.basename(f.filename)
+                    stmt_id = models.create_statement(display_name, filename, data,
+                                                      auth.current_user()["id"])
+                    models.log_action(auth.current_user()["id"], "statement_uploaded",
+                                      "statement", stmt_id, {"name": display_name})
+                    flash(f'"{display_name}" uploaded successfully.', "success")
+                    return redirect(url_for("admin_statements"))
+
+        stmts = models.get_all_statements()
+        return render_template("admin/statements.html", statements=stmts)
+
     # -- Password reset / welcome set-password --------------------------------
 
     @app.route("/forgot-password", methods=["GET", "POST"])
@@ -893,7 +987,7 @@ def register_routes(app: Flask):
             import secrets
             login = request.form.get("login", "").strip()
             user = db.fetchone(
-                "SELECT * FROM users WHERE (username = %s OR email = %s) AND is_active = TRUE",
+                "SELECT * FROM users WHERE (username = %s OR LOWER(email) = LOWER(%s)) AND is_active = TRUE",
                 (login, login),
             )
             if user and user.get("email"):
@@ -946,25 +1040,27 @@ def register_routes(app: Flask):
         if not text:
             return jsonify({"ok": False, "error": "Feedback text is required."}), 400
 
-        image_bytes = None
-        image_type  = None
-        screenshot  = request.files.get("screenshot")
-        if screenshot and screenshot.filename:
-            image_type = screenshot.content_type or ""
-            if image_type not in fb.ALLOWED_IMAGE_TYPES:
+        file_bytes = None
+        file_type  = None
+        file_name  = None
+        attachment = request.files.get("screenshot") or request.files.get("attachment")
+        if attachment and attachment.filename:
+            file_type = attachment.content_type or "application/octet-stream"
+            file_name = attachment.filename
+            data = attachment.read(10 * 1024 * 1024 + 1)
+            if len(data) > 10 * 1024 * 1024:
                 return jsonify({"ok": False,
-                                "error": "Screenshot must be JPEG, PNG, GIF, or WebP."}), 400
-            data = screenshot.read(5 * 1024 * 1024 + 1)
-            if len(data) > 5 * 1024 * 1024:
-                return jsonify({"ok": False,
-                                "error": "Screenshot must be 5 MB or smaller."}), 400
-            image_bytes = data
+                                "error": "Attachment must be 10 MB or smaller."}), 400
+            file_bytes = data
 
-        ok, action = fb.process_feedback(user, text, image_bytes, image_type)
+        ok, action, saved_path, github_url = fb.process_feedback(
+            user, text, file_bytes, file_type, file_name)
         if not ok:
             return jsonify({"ok": False,
                             "error": "Could not deliver your feedback. Please try again."}), 500
 
+        models.save_feedback_submission(
+            user["id"], text, saved_path, file_name, file_type, action, github_url)
         models.log_action(user["id"], "feedback_submitted", None, None,
                           {"action": action, "length": len(text)})
         return jsonify({"ok": True, "action": action})

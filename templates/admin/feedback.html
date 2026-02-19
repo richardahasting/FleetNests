@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Feedback — Admin — Bentley Boat Club{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="fw-bold mb-0"><i class="bi bi-chat-left-text me-2 text-club-blue"></i>Member Feedback</h5>
+  <span class="text-muted small">{{ submissions | length }} submission{{ 's' if submissions | length != 1 }}</span>
+</div>
+
+{% if submissions %}
+<div class="card border-0 shadow-sm">
+  <ul class="list-group list-group-flush">
+    {% for s in submissions %}
+    <li class="list-group-item py-3">
+      <div class="d-flex justify-content-between align-items-start mb-1">
+        <div>
+          <strong>{{ s.full_name }}</strong>
+          <span class="text-muted small ms-2">@{{ s.username }}</span>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+          {% if s.routed_to == 'github_issue' %}
+            <span class="badge bg-primary">GitHub Issue</span>
+          {% elif s.routed_to == 'email' %}
+            <span class="badge bg-success">Email</span>
+          {% else %}
+            <span class="badge bg-secondary">{{ s.routed_to }}</span>
+          {% endif %}
+          <span class="text-muted small">{{ s.submitted_at.strftime('%b %d, %Y %-I:%M %p') }}</span>
+        </div>
+      </div>
+      <div class="text-secondary small mb-2" style="white-space:pre-wrap">{{ s.text }}</div>
+      {% if s.attachment_path %}
+      <div class="mt-1">
+        {% set ext = s.attachment_name.rsplit('.', 1)[-1].lower() if s.attachment_name and '.' in s.attachment_name else '' %}
+        {% if ext in ('jpg', 'jpeg', 'png', 'gif', 'webp') %}
+          <a href="{{ url_for('static', filename=s.attachment_path) }}" target="_blank">
+            <img src="{{ url_for('static', filename=s.attachment_path) }}"
+                 alt="attachment" class="img-thumbnail" style="max-height:160px">
+          </a>
+        {% else %}
+          <a href="{{ url_for('static', filename=s.attachment_path) }}" target="_blank"
+             class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-paperclip me-1"></i>{{ s.attachment_name or 'Attachment' }}
+          </a>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% if s.github_issue_url %}
+      <div class="mt-1 small">
+        <a href="{{ s.github_issue_url }}" target="_blank" class="text-decoration-none">
+          <i class="bi bi-github me-1"></i>{{ s.github_issue_url }}
+        </a>
+      </div>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% else %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-chat-left fs-3 d-block mb-2"></i>
+    No feedback submissions yet.
+  </div>
+</div>
+{% endif %}
+{% endblock %}

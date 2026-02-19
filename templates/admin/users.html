@@ -78,8 +78,18 @@
         {% for u in users %}
         <tr>
           <td>
-            <div class="res-avatar-sm d-inline-flex me-2">{{ u.full_name[0] }}</div>
-            {{ u.full_name }}
+            <div class="res-avatar-sm d-inline-flex me-2">{{ (u.display_name or u.full_name)[0] }}</div>
+            <div class="d-inline-block">
+              <div>{{ u.full_name }}</div>
+              {% if u.display_name %}
+                <div class="text-muted small">Shows as: <em>{{ u.display_name }}</em></div>
+              {% endif %}
+              {% if u.family_account_id %}
+                <div class="text-muted small">
+                  <i class="bi bi-people-fill me-1"></i>Family account
+                </div>
+              {% endif %}
+            </div>
           </td>
           <td><code>{{ u.username }}</code></td>
           <td class="text-muted">{{ u.email or '—' }}</td>
@@ -92,8 +102,12 @@
           </td>
           <td class="text-muted small">{{ u.created_at.strftime('%b %d, %Y') }}</td>
           <td class="text-end">
+            <a href="{{ url_for('admin_edit_user', user_id=u.id) }}"
+               class="btn btn-sm btn-outline-secondary me-1" title="Edit profile / family account">
+              <i class="bi bi-person-gear"></i>
+            </a>
             <a href="{{ url_for('admin_reset_password', user_id=u.id) }}"
-               class="btn btn-sm btn-outline-secondary me-1">
+               class="btn btn-sm btn-outline-secondary me-1" title="Reset password">
               <i class="bi bi-key"></i>
             </a>
             {% if u.id != current_user.id %}

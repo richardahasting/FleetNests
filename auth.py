@@ -33,6 +33,7 @@ def login_user(user: dict):
     session["username"] = user["username"]
     session["full_name"] = user["full_name"]
     session["is_admin"] = user["is_admin"]
+    session["can_manage_statements"] = bool(user.get("can_manage_statements"))
     session.permanent = True
 
 
@@ -49,6 +50,7 @@ def current_user() -> dict | None:
         "username": session["username"],
         "full_name": session["full_name"],
         "is_admin": session["is_admin"],
+        "can_manage_statements": session.get("can_manage_statements", False),
     }
 
 
@@ -62,6 +64,19 @@ def login_required(f):
         if not current_user():
             flash("Please log in to continue.", "warning")
             return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def statements_manager_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        user = current_user()
+        if not user:
+            flash("Please log in to continue.", "warning")
+            return redirect(url_for("login"))
+        if not user.get("can_manage_statements"):
+            abort(403)
         return f(*args, **kwargs)
     return decorated
 
@@ -87,7 +102,7 @@ def authenticate(login: str, password: str) -> dict | None:
     """Return the user row if credentials are valid and account is active.
     Accepts either username or email address as the login identifier."""
     row = db.fetchone(
-        "SELECT * FROM users WHERE (username = %s OR email = %s) AND is_active = TRUE",
+        "SELECT * FROM users WHERE (username = %s OR LOWER(email) = LOWER(%s)) AND is_active = TRUE",
         (login, login),
     )
     if row and check_password(password, row["password_hash"]):

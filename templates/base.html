@@ -52,6 +52,10 @@
              href="{{ url_for('rules_page') }}"><i class="bi bi-journal-bookmark me-1"></i>Rules</a>
         </li>
         <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'statements' %}active{% endif %}"
+             href="{{ url_for('statements') }}"><i class="bi bi-file-earmark-pdf me-1"></i>Statements</a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link {% if request.endpoint == 'help_page' %}active{% endif %}"
              href="{{ url_for('help_page') }}"><i class="bi bi-question-circle me-1"></i>Help</a>
         </li>
@@ -69,9 +73,14 @@
             <li><a class="dropdown-item" href="{{ url_for('admin_incidents') }}"><i class="bi bi-exclamation-triangle me-1"></i>Incidents</a></li>
             <li><a class="dropdown-item" href="{{ url_for('admin_fuel') }}"><i class="bi bi-fuel-pump me-1"></i>Fuel Log</a></li>
             <li><a class="dropdown-item" href="{{ url_for('admin_trip_logs') }}"><i class="bi bi-journal-bookmark me-1"></i>Trip Logs</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('admin_feedback') }}"><i class="bi bi-chat-left-text me-1"></i>Feedback</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="{{ url_for('admin_audit_log') }}"><i class="bi bi-journal-text me-1"></i>Audit Log</a></li>
             <li><a class="dropdown-item" href="{{ url_for('admin_export_csv') }}"><i class="bi bi-download me-1"></i>Export CSV</a></li>
+            {% if current_user.can_manage_statements %}
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('admin_statements') }}"><i class="bi bi-file-earmark-arrow-up me-1"></i>Upload Statement</a></li>
+            {% endif %}
           </ul>
         </li>
         {% endif %}

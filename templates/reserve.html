@@ -116,21 +116,33 @@
           </a>
         </h6>
         <p class="text-muted small mb-3">
-          Minimum <strong>4 hours</strong>, maximum <strong>12 hours</strong>.
-          Max 3 consecutive days · Max 7 upcoming reservations total.
+          Minimum <strong>2 hours</strong>, maximum <strong>6 hours</strong>.
+          Max 3 consecutive days · Max 3 upcoming reservations total.
         </p>
 
         <form method="post" id="reserveForm">
           <div class="row g-3">
             <div class="col-6">
               <label class="form-label" for="start_time">Start Time</label>
-              <input type="time" class="form-control" id="start_time" name="start_time"
-                     step="1800" required>
+              <select class="form-select" id="start_time" name="start_time" required>
+                <option value="">— select —</option>
+                {% for h in range(0, 24) %}
+                  {% for m in [0, 30] %}
+                    {% set hh = '%02d'|format(h) %}
+                    {% set mm = '%02d'|format(m) %}
+                    {% set ampm = 'AM' if h < 12 else 'PM' %}
+                    {% set h12 = h if h <= 12 else h - 12 %}
+                    {% set h12 = 12 if h12 == 0 else h12 %}
+                <option value="{{ hh }}:{{ mm }}">{{ h12 }}:{{ mm }} {{ ampm }}</option>
+                  {% endfor %}
+                {% endfor %}
+              </select>
             </div>
             <div class="col-6">
               <label class="form-label" for="end_time">End Time</label>
-              <input type="time" class="form-control" id="end_time" name="end_time"
-                     step="1800" required>
+              <select class="form-select" id="end_time" name="end_time" required disabled>
+                <option value="">— pick start first —</option>
+              </select>
             </div>
           </div>
 
@@ -179,33 +191,57 @@
 
   if (!startEl) return;
 
-  function update() {
-    if (!startEl.value || !endEl.value) { hint.textContent = ''; return; }
-    const [sh, sm] = startEl.value.split(':').map(Number);
-    const [eh, em] = endEl.value.split(':').map(Number);
-    const mins = (eh * 60 + em) - (sh * 60 + sm);
-    const hrs  = mins / 60;
-
-    if (mins <= 0) {
-      hint.className = 'form-text text-danger';
-      hint.textContent = 'End time must be after start time.';
-      btn.disabled = true;
-    } else if (hrs < 4) {
-      hint.className = 'form-text text-danger';
-      hint.textContent = `${hrs.toFixed(1)}h — minimum is 4 hours.`;
-      btn.disabled = true;
-    } else if (hrs > 12) {
-      hint.className = 'form-text text-danger';
-      hint.textContent = `${hrs.toFixed(1)}h — maximum is 12 hours.`;
-      btn.disabled = true;
-    } else {
-      hint.className = 'form-text text-success';
-      hint.textContent = `${hrs % 1 === 0 ? hrs : hrs.toFixed(1)} hours — looks good!`;
-      btn.disabled = false;
-    }
+  function fmt12(totalMins) {
+    const h24 = Math.floor(totalMins / 60) % 24;
+    const m    = totalMins % 60;
+    const ampm = h24 < 12 ? 'AM' : 'PM';
+    const h12  = h24 % 12 || 12;
+    return {
+      label: h12 + ':' + String(m).padStart(2, '0') + ' ' + ampm,
+      value: String(h24).padStart(2, '0') + ':' + String(m).padStart(2, '0')
+    };
   }
 
-  startEl.addEventListener('change', update);
+  function makeOpt(value, label) {
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = label;
+    return o;
+  }
+
+  function populateEndTimes() {
+    while (endEl.firstChild) endEl.removeChild(endEl.firstChild);
+    endEl.disabled = true;
+    hint.textContent = '';
+    btn.disabled = true;
+
+    if (!startEl.value) {
+      endEl.appendChild(makeOpt('', '— pick start first —'));
+      return;
+    }
+
+    const [sh, sm] = startEl.value.split(':').map(Number);
+    const startMins = sh * 60 + sm;
+
+    endEl.appendChild(makeOpt('', '— select —'));
+    for (let t = startMins + 120; t <= startMins + 360 && t <= 1440; t += 30) {
+      const f = fmt12(t);
+      endEl.appendChild(makeOpt(f.value, f.label));
+    }
+    endEl.disabled = false;
+  }
+
+  function update() {
+    if (!startEl.value || !endEl.value) { hint.textContent = ''; btn.disabled = true; return; }
+    const [sh, sm] = startEl.value.split(':').map(Number);
+    const [eh, em] = endEl.value.split(':').map(Number);
+    const hrs = ((eh * 60 + em) - (sh * 60 + sm)) / 60;
+    hint.className = 'form-text text-success';
+    hint.textContent = (hrs % 1 === 0 ? hrs : hrs.toFixed(1)) + ' hours — looks good!';
+    btn.disabled = false;
+  }
+
+  startEl.addEventListener('change', function () { populateEndTimes(); });
   endEl.addEventListener('change', update);
 })();
 </script>

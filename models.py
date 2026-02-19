@@ -19,9 +19,24 @@ def now_ct() -> datetime:
 # User queries
 # ---------------------------------------------------------------------------
 
+def get_display_name(user: dict) -> str:
+    """Return the name shown publicly for this user (family display name, or full name)."""
+    if user.get("family_account_id"):
+        primary = get_user_by_id(user["family_account_id"])
+        if primary:
+            return primary.get("display_name") or primary["full_name"]
+    return user.get("display_name") or user["full_name"]
+
+
+def get_effective_user_id(user: dict) -> int:
+    """Return the account ID used for reservations (primary if family sub-member)."""
+    return user.get("family_account_id") or user["id"]
+
+
 def get_all_active_users():
     return db.execute(
-        "SELECT id, username, full_name, email, is_admin, created_at "
+        "SELECT id, username, full_name, display_name, family_account_id, "
+        "email, is_admin, created_at "
         "FROM users WHERE is_active = TRUE ORDER BY full_name"
     )
 
@@ -32,7 +47,7 @@ def get_user_by_id(user_id: int):
 
 def create_user(username: str, full_name: str, email: str,
                 password_hash: str, is_admin: bool = False,
-                max_consecutive_days: int = 3, max_pending: int = 7):
+                max_consecutive_days: int = 3, max_pending: int = 3):
     return db.insert(
         "INSERT INTO users (username, full_name, email, password_hash, is_admin, max_consecutive_days, max_pending) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
@@ -44,6 +59,14 @@ def deactivate_user(user_id: int):
     db.execute(
         "UPDATE users SET is_active = FALSE WHERE id = %s",
         (user_id,),
+        fetch=False,
+    )
+
+
+def update_user_profile(user_id: int, display_name: str | None, family_account_id: int | None):
+    db.execute(
+        "UPDATE users SET display_name = %s, family_account_id = %s WHERE id = %s",
+        (display_name or None, family_account_id or None, user_id),
         fetch=False,
     )
 
@@ -104,7 +127,7 @@ def get_user_limits(user_id: int) -> dict:
         "SELECT max_consecutive_days, max_pending FROM users WHERE id = %s",
         (user_id,),
     )
-    return {"max_consecutive": row["max_consecutive_days"] or 3, "max_pending": row["max_pending"] or 7}
+    return {"max_consecutive": row["max_consecutive_days"] or 3, "max_pending": row["max_pending"] or 3}
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +137,8 @@ def get_user_limits(user_id: int) -> dict:
 def get_reservations_range(start: date, end: date) -> list:
     """Return all active reservations between start and end dates (inclusive)."""
     return db.execute(
-        "SELECT r.id, r.date, r.start_time, r.end_time, r.status, r.user_id, u.full_name "
+        "SELECT r.id, r.date, r.start_time, r.end_time, r.status, r.user_id, "
+        "COALESCE(u.display_name, u.full_name) AS full_name "
         "FROM reservations r "
         "JOIN users u ON u.id = r.user_id "
         "WHERE r.date BETWEEN %s AND %s AND r.status IN ('active','pending_approval') "
@@ -209,7 +233,7 @@ def validate_reservation(user_id: int, start_dt: datetime, end_dt: datetime) -> 
     Returns an error string on failure, or None if valid.
 
     Rules enforced:
-      1. Minimum 4 hours, maximum 12 hours duration
+      1. Minimum 2 hours, maximum 6 hours duration
       2. Start must be in the future
       3. Start and end must be on the same calendar day
       4. No overlap with any existing active reservation
@@ -222,11 +246,17 @@ def validate_reservation(user_id: int, start_dt: datetime, end_dt: datetime) -> 
     if end_dt <= start_dt:
         return "End time must be after start time."
 
-    if hours < 4:
-        return f"Minimum reservation length is 4 hours (you selected {hours:.1f}h)."
+    if start_dt.minute % 30 != 0 or start_dt.second != 0:
+        return "Start time must be on a 30-minute interval (e.g. 9:00, 9:30, 10:00)."
 
-    if hours > 12:
-        return f"Maximum reservation length is 12 hours (you selected {hours:.1f}h)."
+    if end_dt.minute % 30 != 0 or end_dt.second != 0:
+        return "End time must be on a 30-minute interval (e.g. 9:00, 9:30, 10:00)."
+
+    if hours < 2:
+        return f"Minimum reservation length is 2 hours (you selected {hours:.1f}h)."
+
+    if hours > 6:
+        return f"Maximum reservation length is 6 hours (you selected {hours:.1f}h)."
 
     if start_dt < now_ct():
         return "Start time cannot be in the past."
@@ -239,13 +269,13 @@ def validate_reservation(user_id: int, start_dt: datetime, end_dt: datetime) -> 
 
     # Overlap check: any active reservation whose window intersects ours
     overlap = db.fetchone(
-        "SELECT r.id, u.full_name FROM reservations r "
+        "SELECT r.id, COALESCE(u.display_name, u.full_name) AS display_name FROM reservations r "
         "JOIN users u ON u.id = r.user_id "
         "WHERE r.status IN ('active','pending_approval') AND r.start_time < %s AND r.end_time > %s",
         (end_dt, start_dt),
     )
     if overlap:
-        return f"That time overlaps with {overlap['full_name']}'s reservation."
+        return f"That time overlaps with {overlap['display_name']}'s reservation."
 
     # Blackout check
     blackout = db.fetchone(
@@ -396,6 +426,36 @@ def get_all_blackouts() -> list:
 # ---------------------------------------------------------------------------
 # Audit log
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Statements
+# ---------------------------------------------------------------------------
+
+def get_all_statements() -> list:
+    return db.execute(
+        "SELECT s.id, s.display_name, s.filename, s.file_size, s.uploaded_at, "
+        "u.full_name AS uploaded_by "
+        "FROM statements s LEFT JOIN users u ON u.id = s.uploaded_by "
+        "ORDER BY s.uploaded_at DESC"
+    )
+
+
+def get_statement_by_id(statement_id: int):
+    return db.fetchone("SELECT * FROM statements WHERE id = %s", (statement_id,))
+
+
+def create_statement(display_name: str, filename: str, file_data: bytes, uploaded_by: int) -> int:
+    row = db.fetchone(
+        "INSERT INTO statements (display_name, filename, file_data, file_size, uploaded_by) "
+        "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+        (display_name, filename, file_data, len(file_data), uploaded_by),
+    )
+    return row["id"]
+
+
+def delete_statement(statement_id: int):
+    db.execute("DELETE FROM statements WHERE id = %s", (statement_id,), fetch=False)
+
 
 def log_action(user_id: int, action: str, target_type: str = None,
                target_id: int = None, detail: dict = None):
@@ -832,4 +892,29 @@ def add_message_photo(message_id: int, data: bytes, content_type: str, filename:
         "INSERT INTO message_photos (message_id, photo_data, content_type, filename) "
         "VALUES (%s, %s, %s, %s) RETURNING id",
         (message_id, data, content_type, filename or None),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Feedback submissions
+# ---------------------------------------------------------------------------
+
+def save_feedback_submission(user_id: int, text: str, attachment_path: str | None,
+                              attachment_name: str | None, attachment_type: str | None,
+                              routed_to: str, github_issue_url: str | None = None):
+    return db.insert(
+        "INSERT INTO feedback_submissions "
+        "(user_id, text, attachment_path, attachment_name, attachment_type, routed_to, github_issue_url) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (user_id, text, attachment_path or None, attachment_name or None,
+         attachment_type or None, routed_to, github_issue_url or None),
+    )
+
+
+def get_all_feedback_submissions() -> list:
+    return db.execute(
+        "SELECT f.*, u.full_name, u.username "
+        "FROM feedback_submissions f "
+        "JOIN users u ON u.id = f.user_id "
+        "ORDER BY f.submitted_at DESC"
     )

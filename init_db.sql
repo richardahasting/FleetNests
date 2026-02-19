@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS users (
     avatar_content_type    VARCHAR(50),
     password_reset_token   VARCHAR(64) UNIQUE,
     password_reset_expires TIMESTAMP,
+    display_name           VARCHAR(100),
+    family_account_id      INTEGER REFERENCES users(id),
+    can_manage_statements  BOOLEAN DEFAULT FALSE,
     created_at             TIMESTAMP DEFAULT NOW()
 );
 
@@ -125,6 +128,19 @@ CREATE TABLE IF NOT EXISTS message_photos (
     uploaded_at  TIMESTAMP DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_msgphoto_msg ON message_photos(message_id);
+
+CREATE TABLE IF NOT EXISTS feedback_submissions (
+    id               SERIAL PRIMARY KEY,
+    user_id          INTEGER REFERENCES users(id),
+    submitted_at     TIMESTAMP DEFAULT NOW(),
+    text             TEXT NOT NULL,
+    attachment_path  VARCHAR(300),
+    attachment_name  VARCHAR(200),
+    attachment_type  VARCHAR(100),
+    routed_to        VARCHAR(30),
+    github_issue_url VARCHAR(300)
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback_submissions(user_id);
 
 -- Grant app user access to all tables and sequences
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO bentley_user;

@@ -12,22 +12,17 @@ Routes via the `claude` CLI (no ANTHROPIC_API_KEY needed in the app):
 
 import json
 import logging
+import mimetypes
 import os
 import subprocess
-import tempfile
+import uuid
 import urllib.error
 import urllib.request
 
 log = logging.getLogger(__name__)
 
-ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
-
-_IMAGE_EXTENSIONS = {
-    "image/jpeg": ".jpg",
-    "image/png":  ".png",
-    "image/gif":  ".gif",
-    "image/webp": ".webp",
-}
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "static", "feedback_uploads")
 
 _PROMPT = """\
 You are the feedback assistant for Bentley Boat Club, a private boating club.
@@ -60,36 +55,58 @@ For everything else:
 def process_feedback(
     user: dict,
     text: str,
-    image_bytes: bytes | None,
-    image_content_type: str | None,
-) -> tuple[bool, str]:
+    file_bytes: bytes | None,
+    file_content_type: str | None,
+    original_filename: str | None = None,
+) -> tuple[bool, str, str | None, str | None]:
     """Triage and route member feedback via the claude CLI.
 
-    Returns (success, action) where action is one of:
-      "github_issue", "email", "fallback_email"
+    Returns (success, action, saved_path, github_issue_url).
+    saved_path is the relative path under static/ if a file was saved, else None.
     """
+    saved_path = None
+    saved_name = None
+
+    # Persist attachment before calling claude so path is stable
+    if file_bytes and file_content_type:
+        ext = mimetypes.guess_extension(file_content_type.split(";")[0].strip()) or ""
+        # guess_extension returns odd things for common types; fix them
+        ext = {".jpe": ".jpg", ".jpeg": ".jpg"}.get(ext, ext)
+        unique_name = f"{uuid.uuid4().hex}{ext}"
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        full_path = os.path.join(UPLOAD_DIR, unique_name)
+        with open(full_path, "wb") as f:
+            f.write(file_bytes)
+        saved_path = f"feedback_uploads/{unique_name}"
+        saved_name = original_filename or unique_name
+        log.info("Attachment saved: %s (%s)", saved_path, file_content_type)
+
     try:
-        result = _call_claude_cli(user, text, image_bytes, image_content_type)
+        result = _call_claude_cli(user, text, saved_path, file_content_type)
     except Exception as exc:
         log.error("claude CLI error in process_feedback: %s", exc)
-        return _fallback_email(user, text)
+        ok, action = _fallback_email(user, text)
+        return ok, action, saved_path, None
 
     action = result.get("action")
+    github_url = None
 
     if action == "github_issue":
-        ok = _create_github_issue(result["title"], result["body"], result.get("labels", []))
+        github_url, ok = _create_github_issue(result["title"], result["body"],
+                                               result.get("labels", []), saved_path)
         if ok:
-            return True, "github_issue"
+            return True, "github_issue", saved_path, github_url
         log.warning("GitHub issue creation failed; falling back to email for: %s", result["title"])
-        ok = _send_email(f"[Feature/Bug] {result['title']}", result["body"])
-        return ok, "fallback_email"
+        ok = _send_email(f"[Feature/Bug] {result['title']}", result["body"], saved_path)
+        return ok, "fallback_email", saved_path, None
 
     if action == "email":
-        ok = _send_email(result["subject"], result["body"])
-        return ok, "email"
+        ok = _send_email(result["subject"], result["body"], saved_path)
+        return ok, "email", saved_path, None
 
     log.warning("Unexpected action from claude CLI: %s; falling back to email", action)
-    return _fallback_email(user, text)
+    ok, action = _fallback_email(user, text)
+    return ok, action, saved_path, None
 
 
 # ---------------------------------------------------------------------------
@@ -99,67 +116,67 @@ def process_feedback(
 def _call_claude_cli(
     user: dict,
     text: str,
-    image_bytes: bytes | None,
-    image_content_type: str | None,
+    saved_path: str | None,
+    file_content_type: str | None,
 ) -> dict:
     """Invoke the claude CLI and return parsed JSON routing decision."""
-    image_path = None
-    try:
-        # Write image to a temp file so claude can read it
-        if image_bytes and image_content_type in ALLOWED_IMAGE_TYPES:
-            ext = _IMAGE_EXTENSIONS.get(image_content_type, ".jpg")
-            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as f:
-                f.write(image_bytes)
-                image_path = f.name
+    message = (
+        f"Member: {user['full_name']} ({user.get('email', 'unknown')})\n\n"
+        f"Feedback:\n{text}"
+    )
+    # Pass full filesystem path of the saved attachment if it's an image claude can read
+    is_image = file_content_type and file_content_type.split("/")[0] == "image"
+    if saved_path and is_image:
+        full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 "static", saved_path)
+        message += f"\n\nAttachment (image): {full_path}"
+    elif saved_path:
+        message += f"\n\nAttachment (file): {saved_path}"
 
-        message = (
-            f"Member: {user['full_name']} ({user.get('email', 'unknown')})\n\n"
-            f"Feedback:\n{text}"
-        )
-        if image_path:
-            message += f"\n\nScreenshot: {image_path}"
+    claude_bin = os.environ.get("CLAUDE_BIN", "/home/richard/.local/bin/claude")
+    # Remove CLAUDECODE so nested-session detection doesn't block us
+    env = os.environ.copy()
+    env.pop("CLAUDECODE", None)
+    result = subprocess.run(
+        [claude_bin, "-p", _PROMPT],
+        input=message,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        env=env,
+    )
 
-        claude_bin = os.environ.get("CLAUDE_BIN", "/home/richard/.local/bin/claude")
-        # Remove CLAUDECODE so nested-session detection doesn't block us
-        env = os.environ.copy()
-        env.pop("CLAUDECODE", None)
-        result = subprocess.run(
-            [claude_bin, "-p", _PROMPT],
-            input=message,
-            capture_output=True,
-            text=True,
-            timeout=60,
-            env=env,
-        )
+    if result.returncode != 0:
+        raise RuntimeError(f"claude exited {result.returncode}: {result.stderr.strip()}")
 
-        if result.returncode != 0:
-            raise RuntimeError(f"claude exited {result.returncode}: {result.stderr.strip()}")
-
-        output = result.stdout.strip()
-        # Strip any accidental markdown fences
-        if output.startswith("```"):
-            output = output.split("```")[1]
-            if output.startswith("json"):
-                output = output[4:]
-        return json.loads(output)
-
-    finally:
-        if image_path and os.path.exists(image_path):
-            os.unlink(image_path)
+    output = result.stdout.strip()
+    # Strip any accidental markdown fences
+    if output.startswith("```"):
+        output = output.split("```")[1]
+        if output.startswith("json"):
+            output = output[4:]
+    return json.loads(output)
 
 
 # ---------------------------------------------------------------------------
 # GitHub issue creation (stdlib urllib only)
 # ---------------------------------------------------------------------------
 
-def _create_github_issue(title: str, body: str, labels: list) -> bool:
+def _create_github_issue(title: str, body: str, labels: list,
+                          saved_path: str | None) -> tuple[str | None, bool]:
+    """Returns (issue_url, success)."""
     token = os.environ.get("GITHUB_TOKEN")
     repo  = os.environ.get("GITHUB_REPO", "richardahasting/bentley-boat")
+    app_url = os.environ.get("APP_URL", "https://bentleyboatclub.com")
     if not token:
         log.error("GITHUB_TOKEN not set; cannot create GitHub issue: %s", title)
-        return False
+        return None, False
 
-    payload = json.dumps({"title": title, "body": body, "labels": labels}).encode()
+    full_body = body
+    if saved_path:
+        full_body += f"\n\n**Attachment:** {app_url}/static/{saved_path}"
+
+    payload = json.dumps({"title": title, "body": full_body, "labels": labels}).encode()
     url = f"https://api.github.com/repos/{repo}/issues"
     req = urllib.request.Request(
         url,
@@ -174,23 +191,30 @@ def _create_github_issue(title: str, body: str, labels: list) -> bool:
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            return resp.status in (200, 201)
+            if resp.status in (200, 201):
+                data = json.loads(resp.read())
+                return data.get("html_url"), True
+            return None, False
     except urllib.error.HTTPError as exc:
         log.error("GitHub API HTTP %s: %s", exc.code, exc.read())
-        return False
+        return None, False
     except Exception as exc:
         log.error("GitHub API error: %s", exc)
-        return False
+        return None, False
 
 
 # ---------------------------------------------------------------------------
 # Email sending (delegates to email_notify)
 # ---------------------------------------------------------------------------
 
-def _send_email(subject: str, body: str) -> bool:
+def _send_email(subject: str, body: str, saved_path: str | None = None) -> bool:
     import email_notify
     to_addr = os.environ.get("FEEDBACK_EMAIL", "")
-    return email_notify.send_email(to_addr, subject, body)
+    app_url = os.environ.get("APP_URL", "https://bentleyboatclub.com")
+    full_body = body
+    if saved_path:
+        full_body += f"\n\nAttachment: {app_url}/static/{saved_path}"
+    return email_notify.send_email(to_addr, subject, full_body)
 
 
 def _fallback_email(user: dict, text: str) -> tuple[bool, str]:
