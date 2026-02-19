@@ -126,6 +126,10 @@ CREATE TABLE IF NOT EXISTS message_photos (
 );
 CREATE INDEX IF NOT EXISTS idx_msgphoto_msg ON message_photos(message_id);
 
+-- Grant app user access to all tables and sequences
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO bentley_user;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO bentley_user;
+
 -- First admin account: username=admin, password=changeme
 -- CHANGE THIS PASSWORD immediately after first login via Admin > Reset Password
 INSERT INTO users (username, full_name, email, password_hash, is_admin)
