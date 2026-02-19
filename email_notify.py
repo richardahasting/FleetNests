@@ -143,6 +143,32 @@ def notify_password_reset(user: dict, token: str) -> bool:
     )
 
 
+def notify_weather_alert(user: dict, res_date, alerts: list) -> bool:
+    """Notify a member of active weather alerts for their upcoming reservation."""
+    if not user.get("email"):
+        return False
+    d = res_date.strftime("%A, %B %d, %Y")
+    alert_lines = []
+    for a in alerts:
+        alert_lines.append(f"  ⚠ {a['event']} ({a['severity']})")
+        alert_lines.append(f"     {a['headline']}")
+        if a.get("instruction"):
+            alert_lines.append(f"     {a['instruction'].splitlines()[0]}")
+    alert_text = "\n".join(alert_lines)
+    return send_email(
+        user["email"],
+        f"⚠ Weather Alert — Your Boat Reservation on {d}",
+        f"Hi {user['full_name']},\n\n"
+        f"There are active weather alerts for Canyon Lake on the date of your reservation ({d}):\n\n"
+        f"{alert_text}\n\n"
+        f"Please review the conditions and decide whether to keep or cancel your reservation.\n\n"
+        f"  Manage your trips: {APP_URL}/reservations\n"
+        f"  Full NWS forecast: https://forecast.weather.gov/MapClick.php?CityName=Canyon+Lake&state=TX\n\n"
+        f"Stay safe on the water.\n\n"
+        f"— Bentley Boat Club",
+    )
+
+
 def notify_waitlist_available(user: dict, desired_date) -> bool:
     """Notify a waitlisted member that their desired date is now open."""
     if not user.get("email"):
