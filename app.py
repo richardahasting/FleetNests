@@ -342,8 +342,9 @@ def register_routes(app: Flask):
                 # If no password supplied, set a random placeholder; member will set their own via email link
                 pw_hash = auth.hash_password(password) if password else auth.hash_password(secrets.token_urlsafe(32))
                 try:
-                    new_id = models.create_user(username, full_name, email, pw_hash, is_admin,
-                                                max_consecutive_days=max_consec, max_pending=max_pend)
+                    row = models.create_user(username, full_name, email, pw_hash, is_admin,
+                                             max_consecutive_days=max_consec, max_pending=max_pend)
+                    new_id = row["id"]
                     models.log_action(auth.current_user()["id"], "user_created", "user", new_id, {"username": username})
                     if not password and email:
                         token = models.create_password_token(new_id)
