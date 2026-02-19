@@ -118,7 +118,12 @@ def process_feedback(
 
     if tool_name == "create_github_issue":
         ok = _create_github_issue(inp["title"], inp["body"], inp.get("labels", []))
-        return ok, "github_issue"
+        if ok:
+            return True, "github_issue"
+        # GitHub unavailable — fall back to email so feedback isn't lost
+        log.warning("GitHub issue creation failed; falling back to email for: %s", inp["title"])
+        ok = _send_email(f"[Feature/Bug] {inp['title']}", inp["body"])
+        return ok, "fallback_email"
 
     if tool_name == "send_email":
         ok = _send_email(inp["subject"], inp["body"])
