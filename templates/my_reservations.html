@@ -22,6 +22,32 @@
       </a>
     </div>
 
+    {# ---- Today/Tomorrow Checklist Reminder Banner ---- #}
+    {% for res in upcoming %}
+      {% if res.date == today or res.date == tomorrow %}
+        {% set label = "today" if res.date == today else "tomorrow" %}
+        {% set tlog = trip_logs_map.get(res.id) %}
+        {% if not tlog or not tlog.checkin_time %}
+        <div class="alert alert-warning border-0 shadow-sm mb-3 d-flex align-items-start gap-3">
+          <i class="bi bi-clipboard2-check fs-4 flex-shrink-0 mt-1"></i>
+          <div>
+            <strong>You have a reservation {{ label }}!</strong>
+            <div class="small mt-1">
+              Review the
+              <a href="{{ url_for('checklist_page') }}" class="alert-link">Captain's Checklist</a>
+              before heading out.
+              {% if res.date == today and not tlog %}
+                When you're ready to launch, use the
+                <a href="{{ url_for('trip_checkout', res_id=res.id) }}" class="alert-link">Check Out</a>
+                button below.
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+
     {# ---- Upcoming Reservations ---- #}
     <h6 class="text-uppercase text-muted fw-semibold small mb-2">
       <i class="bi bi-calendar-check me-1"></i>Upcoming

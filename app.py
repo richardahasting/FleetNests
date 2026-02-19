@@ -246,13 +246,15 @@ def register_routes(app: Flask):
         ical_token = models.get_or_create_ical_token(user["id"])
         tlogs = models.get_trip_logs_for_user(user["id"])
         trip_logs_map = {tlog["res_id"]: tlog for tlog in tlogs}
+        today = date.today()
         return render_template("my_reservations.html",
                                upcoming=data["upcoming"],
                                past=data["past"],
                                waitlist=waitlist,
                                ical_token=ical_token,
                                trip_logs_map=trip_logs_map,
-                               today=date.today())
+                               today=today,
+                               tomorrow=today + timedelta(days=1))
 
     # -- Stats -----------------------------------------------------------
 

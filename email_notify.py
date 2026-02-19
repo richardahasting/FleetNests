@@ -44,6 +44,8 @@ def notify_reservation_confirmed(user: dict, res: dict) -> bool:
         f"Your boat reservation is confirmed:\n\n"
         f"  Date: {d}\n"
         f"  Time: {s} – {e} CT\n\n"
+        f"Before you head out, review the Captain's Checklist:\n"
+        f"  {APP_URL}/checklist\n\n"
         f"Manage your trips at: {APP_URL}\n\n"
         f"— Bentley Boat Club",
     )
@@ -76,6 +78,8 @@ def notify_reservation_approved(user: dict, res: dict) -> bool:
         f"Your reservation request has been approved!\n\n"
         f"  Date: {d}\n"
         f"  Time: {s} – {e} CT\n\n"
+        f"Before you head out, review the Captain's Checklist:\n"
+        f"  {APP_URL}/checklist\n\n"
         f"View it at: {APP_URL}\n\n"
         f"— Bentley Boat Club",
     )
@@ -165,6 +169,30 @@ def notify_weather_alert(user: dict, res_date, alerts: list) -> bool:
         f"  Manage your trips: {APP_URL}/reservations\n"
         f"  Full NWS forecast: https://forecast.weather.gov/MapClick.php?CityName=Canyon+Lake&state=TX\n\n"
         f"Stay safe on the water.\n\n"
+        f"— Bentley Boat Club",
+    )
+
+
+def notify_trip_reminder(user: dict, res: dict) -> bool:
+    """Send evening-before reminder with reservation details and checklist link."""
+    if not user.get("email"):
+        return False
+    d = res["date"].strftime("%A, %B %d, %Y")
+    s = res["start_time"].strftime("%-I:%M %p") if res.get("start_time") else ""
+    e = res["end_time"].strftime("%-I:%M %p")   if res.get("end_time")   else ""
+    return send_email(
+        user["email"],
+        f"Reminder — Boat Reservation Tomorrow ({d})",
+        f"Hi {user['full_name']},\n\n"
+        f"Just a reminder that you have a boat reservation tomorrow:\n\n"
+        f"  Date: {d}\n"
+        f"  Time: {s} – {e} CT\n\n"
+        f"Before you head out, review the Captain's Checklist:\n"
+        f"  {APP_URL}/checklist\n\n"
+        f"On the day of your trip, use the Check Out button on your reservations\n"
+        f"page to complete the pre-departure checklist:\n"
+        f"  {APP_URL}/my-reservations\n\n"
+        f"Stay safe and have a great trip!\n\n"
         f"— Bentley Boat Club",
     )
 
