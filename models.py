@@ -56,6 +56,49 @@ def update_password(user_id: int, password_hash: str):
     )
 
 
+def create_password_token(user_id: int, expires_hours: int = 72) -> str:
+    import secrets as _secrets
+    token = _secrets.token_urlsafe(32)
+    expires = now_ct() + timedelta(hours=expires_hours)
+    db.execute(
+        "UPDATE users SET password_reset_token = %s, password_reset_expires = %s WHERE id = %s",
+        (token, expires, user_id),
+        fetch=False,
+    )
+    return token
+
+
+def consume_password_token(token: str):
+    """Validate token, clear it, return user row or None if invalid/expired."""
+    row = db.fetchone(
+        "SELECT * FROM users WHERE password_reset_token = %s AND is_active = TRUE",
+        (token,),
+    )
+    if not row:
+        return None
+    if row["password_reset_expires"] and now_ct() > row["password_reset_expires"]:
+        return None
+    db.execute(
+        "UPDATE users SET password_reset_token = NULL, password_reset_expires = NULL WHERE id = %s",
+        (row["id"],),
+        fetch=False,
+    )
+    return row
+
+
+def get_user_by_password_token(token: str):
+    """Read-only lookup for token validity check (does not consume the token)."""
+    row = db.fetchone(
+        "SELECT * FROM users WHERE password_reset_token = %s AND is_active = TRUE",
+        (token,),
+    )
+    if not row:
+        return None
+    if row["password_reset_expires"] and now_ct() > row["password_reset_expires"]:
+        return None
+    return row
+
+
 def get_user_limits(user_id: int) -> dict:
     row = db.fetchone(
         "SELECT max_consecutive_days, max_pending FROM users WHERE id = %s",

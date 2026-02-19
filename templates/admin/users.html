@@ -26,12 +26,14 @@
           <input type="text" class="form-control" name="full_name" required>
         </div>
         <div class="col-md-6">
-          <label class="form-label">Email <small class="text-muted">(optional)</small></label>
+          <label class="form-label">Email</label>
           <input type="email" class="form-control" name="email">
+          <div class="form-text">Required if no password is set.</div>
         </div>
         <div class="col-md-6">
-          <label class="form-label">Password</label>
-          <input type="password" class="form-control" name="password" required autocomplete="new-password">
+          <label class="form-label">Password <span class="text-muted fw-normal">(optional)</span></label>
+          <input type="password" class="form-control" name="password" autocomplete="new-password">
+          <div class="form-text">Leave blank to send a welcome email with a setup link.</div>
         </div>
         <div class="col-12">
           <div class="form-check">

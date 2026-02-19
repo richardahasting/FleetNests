@@ -325,6 +325,7 @@ def register_routes(app: Flask):
     @auth.admin_required
     def admin_new_user():
         if request.method == "POST":
+            import secrets
             username  = request.form.get("username", "").strip().lower()
             full_name = request.form.get("full_name", "").strip()
             email     = request.form.get("email", "").strip()
@@ -333,15 +334,24 @@ def register_routes(app: Flask):
             max_consec = int(request.form.get("max_consecutive_days", 3))
             max_pend   = int(request.form.get("max_pending", 7))
 
-            if not username or not full_name or not password:
-                flash("Username, full name, and password are required.", "danger")
+            if not username or not full_name:
+                flash("Username and full name are required.", "danger")
+            elif not password and not email:
+                flash("Provide either a password or an email address (for welcome email).", "danger")
             else:
-                pw_hash = auth.hash_password(password)
+                # If no password supplied, set a random placeholder; member will set their own via email link
+                pw_hash = auth.hash_password(password) if password else auth.hash_password(secrets.token_urlsafe(32))
                 try:
-                    models.create_user(username, full_name, email, pw_hash, is_admin,
-                                       max_consecutive_days=max_consec, max_pending=max_pend)
-                    models.log_action(auth.current_user()["id"], "user_created", "user", None, {"username": username})
-                    flash(f"User {username} created.", "success")
+                    new_id = models.create_user(username, full_name, email, pw_hash, is_admin,
+                                                max_consecutive_days=max_consec, max_pending=max_pend)
+                    models.log_action(auth.current_user()["id"], "user_created", "user", new_id, {"username": username})
+                    if not password and email:
+                        token = models.create_password_token(new_id)
+                        user_dict = {"full_name": full_name, "email": email}
+                        email_notify.notify_welcome(user_dict, token)
+                        flash(f"Member {username} created — welcome email sent to {email}.", "success")
+                    else:
+                        flash(f"Member {username} created.", "success")
                     return redirect(url_for("admin_users"))
                 except Exception as e:
                     if "unique" in str(e).lower():
@@ -848,6 +858,56 @@ def register_routes(app: Flask):
     def admin_trip_logs():
         logs = models.get_all_trip_logs()
         return render_template("admin/trip_logs.html", logs=logs)
+
+    # -- Password reset / welcome set-password --------------------------------
+
+    @app.route("/forgot-password", methods=["GET", "POST"])
+    def forgot_password():
+        if auth.current_user():
+            return redirect(url_for("calendar"))
+        if request.method == "POST":
+            import secrets
+            login = request.form.get("login", "").strip()
+            user = db.fetchone(
+                "SELECT * FROM users WHERE (username = %s OR email = %s) AND is_active = TRUE",
+                (login, login),
+            )
+            if user and user.get("email"):
+                token = models.create_password_token(user["id"])
+                email_notify.notify_password_reset(user, token)
+            # Always show the same message to prevent account enumeration
+            flash("If that account exists and has an email address, a reset link has been sent.", "info")
+            return redirect(url_for("login"))
+        return render_template("forgot_password.html")
+
+    @app.route("/set-password/<token>", methods=["GET", "POST"])
+    def set_password(token: str):
+        if auth.current_user():
+            return redirect(url_for("calendar"))
+        if request.method == "POST":
+            user = models.consume_password_token(token)
+            if not user:
+                flash("That link is invalid or has expired. Request a new one.", "danger")
+                return redirect(url_for("login"))
+            new_pw  = request.form.get("new_password", "")
+            confirm = request.form.get("confirm_password", "")
+            if len(new_pw) < 8:
+                flash("Password must be at least 8 characters.", "danger")
+                return redirect(url_for("set_password", token=token))
+            if new_pw != confirm:
+                flash("Passwords do not match.", "danger")
+                return redirect(url_for("set_password", token=token))
+            models.update_password(user["id"], auth.hash_password(new_pw))
+            models.log_action(user["id"], "password_set_via_token", "user", user["id"])
+            flash("Password set — please log in.", "success")
+            return redirect(url_for("login"))
+
+        # GET: verify token is still valid before showing the form
+        user = models.get_user_by_password_token(token)
+        if not user:
+            flash("That link is invalid or has expired. Request a new one.", "danger")
+            return redirect(url_for("login"))
+        return render_template("set_password.html", token=token, user=user)
 
     # -- Member Feedback (AI-routed) ----------------------------------------
 

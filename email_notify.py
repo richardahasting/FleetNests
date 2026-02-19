@@ -111,6 +111,38 @@ def notify_email_verify(user: dict, new_email: str, token: str) -> bool:
     )
 
 
+def notify_welcome(user: dict, token: str) -> bool:
+    """Send welcome email to new member with a one-time password-setup link."""
+    if not user.get("email"):
+        return False
+    return send_email(
+        user["email"],
+        "Welcome to Bentley Boat Club — set your password",
+        f"Hi {user['full_name']},\n\n"
+        f"Your Bentley Boat Club account has been created.\n\n"
+        f"Click the link below to set your password and get started (expires in 72 hours):\n\n"
+        f"  {APP_URL}/set-password/{token}\n\n"
+        f"If you have any questions, contact your club administrator.\n\n"
+        f"— Bentley Boat Club",
+    )
+
+
+def notify_password_reset(user: dict, token: str) -> bool:
+    """Send password-reset link to member's email address."""
+    if not user.get("email"):
+        return False
+    return send_email(
+        user["email"],
+        "Reset your Bentley Boat Club password",
+        f"Hi {user['full_name']},\n\n"
+        f"We received a request to reset your password.\n\n"
+        f"Click the link below to choose a new password (expires in 72 hours):\n\n"
+        f"  {APP_URL}/set-password/{token}\n\n"
+        f"If you did not request this, you can safely ignore this email — your password has not changed.\n\n"
+        f"— Bentley Boat Club",
+    )
+
+
 def notify_waitlist_available(user: dict, desired_date) -> bool:
     """Notify a waitlisted member that their desired date is now open."""
     if not user.get("email"):

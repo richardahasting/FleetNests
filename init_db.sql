@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS users (
     email_verify_expires   TIMESTAMP,
     avatar                 BYTEA,
     avatar_content_type    VARCHAR(50),
+    password_reset_token   VARCHAR(64) UNIQUE,
+    password_reset_expires TIMESTAMP,
     created_at             TIMESTAMP DEFAULT NOW()
 );
 
