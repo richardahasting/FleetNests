@@ -648,35 +648,33 @@ def get_user_ical_reservations(user_id: int) -> list:
 # Trip logs
 # ---------------------------------------------------------------------------
 
+CAPTAIN_CHECKLIST_DISCLAIMER = (
+    "Boating involves risks. The Captain and passengers accept all responsibility for any damage, "
+    "injury, death, or claims from using this boat, and agree to indemnify and hold the Owner "
+    "and other Boat Club Members harmless. Owner and Members shall not be liable for any physical, "
+    "financial or any other damages."
+)
+
+MARINA_PHONE = "830-255-7442"
+
 CAPTAIN_CHECKLIST = [
-    # Safety Equipment (indices 0-4)
-    "Life jackets / PFDs accessible for all aboard",
-    "Fire extinguisher charged and accessible",
-    "Distress signals (flares / whistle)",
-    "Horn or whistle",
-    "First aid kit stocked",
-    # Navigation & Docs (indices 5-7)
-    "Current registration on board",
-    "Navigation lights functional",
-    "Weather forecast checked",
-    # Engine & Mechanical (indices 8-11)
-    "Engine oil level checked",
-    "Engine starts and runs normally",
-    "Bilge pump operational",
-    "No fuel leaks or unusual odors",
-    # Before Departure (indices 12-16)
-    "Fuel level noted",
-    "Float plan left with someone ashore",
-    "Lines and fenders stowed",
-    "Passengers briefed on safety",
-    "Area clear — safe to depart",
+    # Pre-Launch (indices 0-3)
+    "Unplug shore power (back left of boat), secure both cords. Turn electrical power ON — RED Perko switch to DOWN position.",
+    "Verify life vests in left side seat compartments. Fire extinguisher, first aid kit and emergency equipment under Captain's seat.",
+    "Connect & turn on Garmin depth finder, verify approx. 16 ft depth at slip. Monitor depth finder at all times to avoid prop strike.",
+    "Visually verify prop is in good condition. Trim motor all the way down before starting. Plug in dash safety kill switch clip.",
+    # Starting & Departure (indices 4-6)
+    "STARTING: Throttle in neutral. After starting, visually verify cooling water stream exiting on the left side of outboard motor.",
+    "Verify fuel gauge near full, passengers secure, then disconnect tiedowns at cleats on the boat (ropes stay tied to dock).",
+    "Operate at best idle speed (~900 RPM) in all no-wake zones.",
+    # Return & Shutdown (index 7)
+    "RETURN: Gas up upon return. Get dockhand assistance. Return to slip. Secure boat — follow ALL launch procedures in reverse order. Turn Perko switch OFF (up position), connect shore power. Clean and check belongings.",
 ]
 
 CHECKLIST_CATEGORIES = [
-    ("Safety Equipment",    list(range(0, 5))),
-    ("Navigation & Docs",   list(range(5, 8))),
-    ("Engine & Mechanical", list(range(8, 12))),
-    ("Before Departure",    list(range(12, 17))),
+    ("Pre-Launch",           list(range(0, 4))),
+    ("Starting & Departure", list(range(4, 7))),
+    ("Return & Shutdown",    list(range(7, 8))),
 ]
 
 FUEL_LEVELS = {

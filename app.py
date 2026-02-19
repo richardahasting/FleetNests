@@ -810,6 +810,8 @@ def register_routes(app: Flask):
                                CAPTAIN_CHECKLIST=models.CAPTAIN_CHECKLIST,
                                CHECKLIST_CATEGORIES=models.CHECKLIST_CATEGORIES,
                                FUEL_LEVELS=models.FUEL_LEVELS,
+                               DISCLAIMER=models.CAPTAIN_CHECKLIST_DISCLAIMER,
+                               MARINA_PHONE=models.MARINA_PHONE,
                                now_time=now_time)
 
     @app.route("/trips/<int:res_id>/checkin", methods=["GET", "POST"])
@@ -859,6 +861,25 @@ def register_routes(app: Flask):
     def admin_trip_logs():
         logs = models.get_all_trip_logs()
         return render_template("admin/trip_logs.html", logs=logs)
+
+    # -- Club Rules & Captain's Checklist -------------------------------------
+
+    @app.route("/rules")
+    @auth.login_required
+    def rules_page():
+        return render_template("rules.html",
+                               CAPTAIN_CHECKLIST=models.CAPTAIN_CHECKLIST,
+                               CHECKLIST_CATEGORIES=models.CHECKLIST_CATEGORIES,
+                               DISCLAIMER=models.CAPTAIN_CHECKLIST_DISCLAIMER)
+
+    @app.route("/checklist")
+    @auth.login_required
+    def checklist_page():
+        return render_template("checklist.html",
+                               CAPTAIN_CHECKLIST=models.CAPTAIN_CHECKLIST,
+                               CHECKLIST_CATEGORIES=models.CHECKLIST_CATEGORIES,
+                               MARINA_PHONE=models.MARINA_PHONE,
+                               DISCLAIMER=models.CAPTAIN_CHECKLIST_DISCLAIMER)
 
     # -- Password reset / welcome set-password --------------------------------
 

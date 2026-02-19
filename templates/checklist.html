@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Captain's Checklist — Bentley Boat Club{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-6">
+
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <h5 class="mb-0 fw-bold">
+        <i class="bi bi-clipboard2-check me-2 text-club-blue"></i>Captain's Checklist
+      </h5>
+      <button class="btn btn-sm btn-outline-secondary d-print-none" onclick="window.print()">
+        <i class="bi bi-printer me-1"></i>Print
+      </button>
+    </div>
+
+    <div class="alert alert-warning border-warning mb-4">
+      <p class="fw-bold mb-1">{{ DISCLAIMER }}</p>
+      <p class="fw-bold mb-0">
+        NO SUCH THING AS DRIVING TOO SLOW AROUND THE MARINA &amp; SLIPS.
+        USE A PASSENGER &amp; THE PUSH POLE TO ASSIST AROUND THE BOAT SLIP,
+        ESPECIALLY WHEN DOCKING.
+      </p>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-0">
+        {% for cat_name, indices in CHECKLIST_CATEGORIES %}
+        <div class="{% if not loop.first %}border-top{% endif %} px-4 pt-3 pb-2">
+          <div class="text-muted small fw-semibold text-uppercase mb-2">{{ cat_name }}</div>
+          {% for idx in indices %}
+          <div class="d-flex gap-3 mb-3">
+            <div class="d-print-none">
+              <div class="border border-2 rounded" style="width:1.4rem;height:1.4rem;flex-shrink:0;margin-top:2px"></div>
+            </div>
+            <div class="d-none d-print-block">
+              <div class="border border-2 rounded" style="width:1.2rem;height:1.2rem;flex-shrink:0;margin-top:2px"></div>
+            </div>
+            <div class="small"><strong>{{ loop.index }}.</strong> {{ CAPTAIN_CHECKLIST[idx] }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="card-footer bg-transparent small">
+        <i class="bi bi-telephone-fill me-1 text-danger"></i>
+        <strong>Emergency: Call Marina at <a href="tel:8302557442">{{ MARINA_PHONE }}</a></strong>
+        &nbsp;·&nbsp; <strong>CAPTAIN IS IN CHARGE. SAFETY IS NO ACCIDENT.</strong>
+      </div>
+    </div>
+
+    <div class="text-center d-print-none">
+      <a href="{{ url_for('rules_page') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-journal-bookmark me-1"></i>View Club Rules
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
