@@ -9,9 +9,14 @@
       <h5 class="mb-0 fw-bold">
         <i class="bi bi-clipboard2-check me-2 text-club-blue"></i>Captain's Checklist
       </h5>
-      <button class="btn btn-sm btn-outline-secondary d-print-none" onclick="window.print()">
-        <i class="bi bi-printer me-1"></i>Print
-      </button>
+      <div class="d-flex gap-2 d-print-none">
+        <button class="btn btn-sm btn-outline-secondary" onclick="window.print()">
+          <i class="bi bi-printer me-1"></i>Print
+        </button>
+        <button class="btn btn-sm btn-outline-danger" onclick="resetChecklist()">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+        </button>
+      </div>
     </div>
 
     <div class="alert alert-warning border-warning mb-4">
@@ -23,20 +28,27 @@
       </p>
     </div>
 
+    <div class="alert alert-info border-0 shadow-sm mb-3 d-print-none small">
+      <i class="bi bi-info-circle me-1"></i>
+      Check items off here as a reference. To <strong>record your checklist for a trip</strong>,
+      use the <strong>Check Out</strong> button on
+      <a href="{{ url_for('my_reservations') }}" class="alert-link">My Reservations</a>
+      on the day of your reservation.
+    </div>
+
     <div class="card border-0 shadow-sm mb-4">
       <div class="card-body p-0">
         {% for cat_name, indices in CHECKLIST_CATEGORIES %}
         <div class="{% if not loop.first %}border-top{% endif %} px-4 pt-3 pb-2">
           <div class="text-muted small fw-semibold text-uppercase mb-2">{{ cat_name }}</div>
           {% for idx in indices %}
-          <div class="d-flex gap-3 mb-3">
-            <div class="d-print-none">
-              <div class="border border-2 rounded" style="width:1.4rem;height:1.4rem;flex-shrink:0;margin-top:2px"></div>
-            </div>
-            <div class="d-none d-print-block">
-              <div class="border border-2 rounded" style="width:1.2rem;height:1.2rem;flex-shrink:0;margin-top:2px"></div>
-            </div>
-            <div class="small"><strong>{{ loop.index }}.</strong> {{ CAPTAIN_CHECKLIST[idx] }}</div>
+          {% set item_id = "chk_" ~ idx %}
+          <div class="form-check mb-3">
+            <input class="form-check-input border-2" type="checkbox" id="{{ item_id }}"
+                   style="width:1.2rem;height:1.2rem;margin-top:0.15rem">
+            <label class="form-check-label small ms-2" for="{{ item_id }}">
+              <strong>{{ loop.index }}.</strong> {{ CAPTAIN_CHECKLIST[idx] }}
+            </label>
           </div>
           {% endfor %}
         </div>
@@ -49,6 +61,16 @@
       </div>
     </div>
 
+    <div class="d-print-none mb-4">
+      <div class="d-flex justify-content-between small text-muted mb-1">
+        <span>Progress</span>
+        <span id="progress-label">0 / {{ CAPTAIN_CHECKLIST | length }}</span>
+      </div>
+      <div class="progress" style="height:0.6rem">
+        <div id="progress-bar" class="progress-bar bg-success" role="progressbar" style="width:0%"></div>
+      </div>
+    </div>
+
     <div class="text-center d-print-none">
       <a href="{{ url_for('rules_page') }}" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-journal-bookmark me-1"></i>View Club Rules
@@ -57,4 +79,18 @@
 
   </div>
 </div>
+
+<script>
+  const total = {{ CAPTAIN_CHECKLIST | length }};
+  function updateProgress() {
+    const checked = document.querySelectorAll('.form-check-input:checked').length;
+    document.getElementById('progress-label').textContent = checked + ' / ' + total;
+    document.getElementById('progress-bar').style.width = (checked / total * 100) + '%';
+  }
+  function resetChecklist() {
+    document.querySelectorAll('.form-check-input').forEach(cb => cb.checked = false);
+    updateProgress();
+  }
+  document.querySelectorAll('.form-check-input').forEach(cb => cb.addEventListener('change', updateProgress));
+</script>
 {% endblock %}
