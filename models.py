@@ -19,6 +19,12 @@ def now_ct() -> datetime:
 # User queries
 # ---------------------------------------------------------------------------
 
+def default_member_name(full_name: str) -> str:
+    """Derive default member name from full name: 'Richard Hasting' → 'The Hasting family'."""
+    last = full_name.strip().rsplit(" ", 1)[-1]
+    return f"The {last} family"
+
+
 def get_display_name(user: dict) -> str:
     """Return the name shown publicly for this user (family display name, or full name)."""
     if user.get("family_account_id"):
@@ -48,10 +54,13 @@ def get_user_by_id(user_id: int):
 def create_user(username: str, full_name: str, email: str,
                 password_hash: str, is_admin: bool = False,
                 max_consecutive_days: int = 3, max_pending: int = 3):
+    member_name = default_member_name(full_name)
     return db.insert(
-        "INSERT INTO users (username, full_name, email, password_hash, is_admin, max_consecutive_days, max_pending) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
-        (username, full_name, email, password_hash, is_admin, max_consecutive_days, max_pending),
+        "INSERT INTO users (username, full_name, email, password_hash, is_admin, "
+        "max_consecutive_days, max_pending, display_name) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (username, full_name, email, password_hash, is_admin,
+         max_consecutive_days, max_pending, member_name),
     )
 
 
@@ -67,6 +76,22 @@ def update_user_profile(user_id: int, display_name: str | None, family_account_i
     db.execute(
         "UPDATE users SET display_name = %s, family_account_id = %s WHERE id = %s",
         (display_name or None, family_account_id or None, user_id),
+        fetch=False,
+    )
+
+
+def update_member_name(user_id: int, member_name: str):
+    db.execute(
+        "UPDATE users SET display_name = %s WHERE id = %s",
+        (member_name or None, user_id),
+        fetch=False,
+    )
+
+
+def update_family_credentials(user_id: int, email2: str | None, password_hash2: str | None):
+    db.execute(
+        "UPDATE users SET email2 = %s, password_hash2 = %s WHERE id = %s",
+        (email2 or None, password_hash2 or None, user_id),
         fetch=False,
     )
 

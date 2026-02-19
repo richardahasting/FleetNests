@@ -740,6 +740,41 @@ def register_routes(app: Flask):
                     models.log_action(user["id"], "password_changed", "user", user["id"])
                     flash("Password changed successfully.", "success")
 
+            elif action == "member_name":
+                name = request.form.get("member_name", "").strip()
+                if not name:
+                    flash("Member name cannot be blank.", "danger")
+                else:
+                    models.update_member_name(user["id"], name)
+                    flash("Member name updated.", "success")
+
+            elif action == "family_login":
+                email2   = request.form.get("email2", "").strip().lower()
+                new_pw2  = request.form.get("new_password2", "")
+                confirm2 = request.form.get("confirm_password2", "")
+                clear    = request.form.get("clear_family", "")
+                if clear:
+                    models.update_family_credentials(user["id"], None, None)
+                    flash("Family login removed.", "success")
+                elif not email2 or "@" not in email2:
+                    flash("Enter a valid email address for the family login.", "danger")
+                elif new_pw2 and len(new_pw2) < 8:
+                    flash("Family password must be at least 8 characters.", "danger")
+                elif new_pw2 and new_pw2 != confirm2:
+                    flash("Family passwords do not match.", "danger")
+                else:
+                    # Check email2 not already used by another account
+                    taken = db.fetchone(
+                        "SELECT id FROM users WHERE (LOWER(email)=%s OR LOWER(email2)=%s) AND id!=%s",
+                        (email2, email2, user["id"]),
+                    )
+                    if taken:
+                        flash("That email is already in use by another account.", "danger")
+                    else:
+                        pw2_hash = auth.hash_password(new_pw2) if new_pw2 else user.get("password_hash2")
+                        models.update_family_credentials(user["id"], email2, pw2_hash)
+                        flash("Family login updated.", "success")
+
             return redirect(url_for("profile"))
 
         user = models.get_user_by_id(user_session["id"])

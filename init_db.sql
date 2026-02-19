@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS users (
     password_reset_expires TIMESTAMP,
     display_name           VARCHAR(100),
     family_account_id      INTEGER REFERENCES users(id),
+    email2                 VARCHAR(100),
+    password_hash2         VARCHAR(255),
     can_manage_statements  BOOLEAN DEFAULT FALSE,
     created_at             TIMESTAMP DEFAULT NOW()
 );

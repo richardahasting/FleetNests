@@ -100,11 +100,20 @@ def admin_required(f):
 
 def authenticate(login: str, password: str) -> dict | None:
     """Return the user row if credentials are valid and account is active.
-    Accepts either username or email address as the login identifier."""
+    Accepts username, primary email, or secondary email (email2) as the login identifier.
+    Secondary email is checked against password_hash2."""
+    login_lower = login.lower()
     row = db.fetchone(
-        "SELECT * FROM users WHERE (username = %s OR LOWER(email) = LOWER(%s)) AND is_active = TRUE",
-        (login, login),
+        "SELECT * FROM users WHERE (username = %s OR LOWER(email) = %s) AND is_active = TRUE",
+        (login, login_lower),
     )
     if row and check_password(password, row["password_hash"]):
         return row
+    # Check secondary email + secondary password
+    row2 = db.fetchone(
+        "SELECT * FROM users WHERE LOWER(email2) = %s AND is_active = TRUE AND password_hash2 IS NOT NULL",
+        (login_lower,),
+    )
+    if row2 and check_password(password, row2["password_hash2"]):
+        return row2
     return None

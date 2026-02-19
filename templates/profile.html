@@ -134,6 +134,85 @@
       </div>
     </div>
 
+    {# ---- Member Name ---- #}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-people me-2 text-club-blue"></i>Member Name
+      </div>
+      <div class="card-body p-4">
+        <form method="post">
+          <input type="hidden" name="action" value="member_name">
+          <div class="mb-3">
+            <label class="form-label" for="member_name">Name shown on calendar &amp; reservations</label>
+            <input type="text" class="form-control" id="member_name" name="member_name"
+                   value="{{ user.display_name or '' }}"
+                   placeholder="e.g. The Hasting family">
+            <div class="form-text">
+              Defaults to <em>The {{ user.full_name.rsplit(' ', 1)[-1] }} family</em>.
+              Shown publicly on the calendar instead of your login name.
+            </div>
+          </div>
+          <button type="submit" class="btn btn-club-blue">
+            <i class="bi bi-save me-1"></i>Save
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {# ---- Family Login ---- #}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-transparent fw-semibold">
+        <i class="bi bi-person-plus me-2 text-club-blue"></i>Family Login
+      </div>
+      <div class="card-body p-4">
+        <p class="text-muted small mb-3">
+          Add a second email and password so another family member can log in to the
+          same account. They can book, view, and cancel reservations just like you.
+        </p>
+        {% if user.email2 %}
+        <div class="alert alert-success py-2 small mb-3">
+          <i class="bi bi-check-circle me-1"></i>
+          Family login active: <strong>{{ user.email2 }}</strong>
+        </div>
+        {% endif %}
+        <form method="post">
+          <input type="hidden" name="action" value="family_login">
+          <div class="mb-3">
+            <label class="form-label" for="email2">Family Member Email</label>
+            <input type="email" class="form-control" id="email2" name="email2"
+                   value="{{ user.email2 or '' }}" placeholder="spouse@example.com">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="new_password2">
+              Family Password
+              {% if user.email2 %}<span class="text-muted fw-normal">(leave blank to keep current)</span>{% endif %}
+            </label>
+            <input type="password" class="form-control" id="new_password2" name="new_password2"
+                   autocomplete="new-password" minlength="8"
+                   {% if not user.email2 %}required{% endif %}>
+            <div class="form-text">Minimum 8 characters.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="confirm_password2">Confirm Family Password</label>
+            <input type="password" class="form-control" id="confirm_password2"
+                   name="confirm_password2" autocomplete="new-password">
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-club-blue">
+              <i class="bi bi-save me-1"></i>{{ 'Update' if user.email2 else 'Set Family Login' }}
+            </button>
+            {% if user.email2 %}
+            <button type="submit" name="clear_family" value="1"
+                    class="btn btn-outline-danger"
+                    onclick="return confirm('Remove the family login?')">
+              <i class="bi bi-trash me-1"></i>Remove
+            </button>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+    </div>
+
     {# ---- Change Password ---- #}
     <div class="card border-0 shadow-sm mb-4">
       <div class="card-header bg-transparent fw-semibold">
