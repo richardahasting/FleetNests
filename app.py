@@ -38,6 +38,8 @@ def create_app():
     prefix = os.environ.get("APP_PREFIX", "/")
     app.config["APPLICATION_ROOT"] = prefix
     app.config["PREFERRED_URL_SCHEME"] = "https"
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_SECURE"] = True
 
     # Trust the reverse proxy (nginx) for host/scheme/prefix headers
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
@@ -704,10 +706,11 @@ def register_routes(app: Flask):
                 new_email = request.form.get("new_email", "").strip().lower()
                 if not new_email or "@" not in new_email:
                     flash("Enter a valid email address.", "danger")
-                elif new_email == user.get("email", ""):
+                elif new_email == (user.get("email") or "").lower():
                     flash("That's already your current email.", "warning")
+                elif user.get("pending_email"):
+                    flash("A verification email is already pending. Check your inbox or wait for it to expire.", "warning")
                 else:
-                    existing = models.get_user_by_id(user["id"])
                     # Check not taken by another user
                     taken = db.fetchone(
                         "SELECT id FROM users WHERE (email = %s OR username = %s) AND id != %s",
@@ -758,6 +761,8 @@ def register_routes(app: Flask):
                     flash("Family login removed.", "success")
                 elif not email2 or "@" not in email2:
                     flash("Enter a valid email address for the family login.", "danger")
+                elif email2 == (user.get("email") or "").lower():
+                    flash("Family email cannot be the same as your primary email.", "danger")
                 elif new_pw2 and len(new_pw2) < 8:
                     flash("Family password must be at least 8 characters.", "danger")
                 elif new_pw2 and new_pw2 != confirm2:
