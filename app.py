@@ -50,10 +50,14 @@ def create_app():
     def inject_user():
         return {"current_user": auth.current_user()}
 
-    # Custom 403 page
+    # Custom error pages
     @app.errorhandler(403)
     def forbidden(e):
         return render_template("403.html"), 403
+
+    @app.errorhandler(404)
+    def not_found(e):
+        return render_template("404.html"), 404
 
     register_routes(app)
     return app
@@ -508,9 +512,12 @@ def register_routes(app: Flask):
     @auth.login_required
     def new_incident():
         user = auth.current_user()
+        eff_id = models.get_effective_user_id(user)
         # Allow linking to a specific past reservation
         res_id = request.args.get("res_id", type=int)
         res = models.get_reservation_by_id(res_id) if res_id else None
+        if res and not user["is_admin"] and res["user_id"] != eff_id:
+            abort(403)
 
         if request.method == "POST":
             res_id_form = request.form.get("res_id", type=int)
@@ -554,8 +561,11 @@ def register_routes(app: Flask):
     @auth.login_required
     def new_fuel_entry():
         user = auth.current_user()
+        eff_id = models.get_effective_user_id(user)
         res_id = request.args.get("res_id", type=int)
         res = models.get_reservation_by_id(res_id) if res_id else None
+        if res and not user["is_admin"] and res["user_id"] != eff_id:
+            abort(403)
 
         if request.method == "POST":
             res_id_form     = request.form.get("res_id", type=int)
