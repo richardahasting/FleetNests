@@ -39,7 +39,8 @@ def create_app():
     app.config["APPLICATION_ROOT"] = prefix
     app.config["PREFERRED_URL_SCHEME"] = "https"
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-    app.config["SESSION_COOKIE_SECURE"] = True
+    # Secure flag: True in production (HTTPS), False for local HTTP dev/testing
+    app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"
 
     # Trust the reverse proxy (nginx) for host/scheme/prefix headers
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
@@ -564,21 +565,27 @@ def register_routes(app: Flask):
             total_str       = request.form.get("total_cost", "").strip()
             notes           = request.form.get("notes", "").strip()[:300]
 
-            try:
-                ldate   = date.fromisoformat(log_date)
-                gallons = float(gallons_str)
-                price   = float(price_str) if price_str else None
-                total   = float(total_str) if total_str else (
-                    round(gallons * price, 2) if price else None
-                )
-                if gallons <= 0:
-                    raise ValueError("gallons must be positive")
-                models.create_fuel_entry(user["id"], res_id_form, ldate, gallons,
-                                         price, total, notes)
-                flash(f"Fuel entry logged: {gallons} gal on {ldate.strftime('%B %d, %Y')}.", "success")
-                return redirect(url_for("my_reservations"))
-            except ValueError as ex:
-                flash(f"Invalid input: {ex}", "danger")
+            if not log_date:
+                flash("Date is required.", "danger")
+            elif not gallons_str:
+                flash("Gallons is required.", "danger")
+            else:
+                try:
+                    ldate   = date.fromisoformat(log_date)
+                    gallons = float(gallons_str)
+                    price   = float(price_str) if price_str else None
+                    total   = float(total_str) if total_str else (
+                        round(gallons * price, 2) if price else None
+                    )
+                    if gallons <= 0:
+                        flash("Gallons must be a positive number.", "danger")
+                    else:
+                        models.create_fuel_entry(user["id"], res_id_form, ldate, gallons,
+                                                 price, total, notes)
+                        flash(f"Fuel entry logged: {gallons} gal on {ldate.strftime('%B %d, %Y')}.", "success")
+                        return redirect(url_for("my_reservations"))
+                except ValueError:
+                    flash("Invalid date or number format. Please check your entries.", "danger")
 
         return render_template("fuel_form.html", res=res,
                                today=date.today().isoformat())
@@ -871,12 +878,13 @@ def register_routes(app: Flask):
         res = models.get_reservation_by_id(res_id)
         if not res:
             abort(404)
+        # Auth check first — before trip_log so non-owners always get 403
+        if not user["is_admin"] and res["user_id"] != eff_id:
+            abort(403)
         trip_log = models.get_trip_log(res_id)
         if not trip_log:
             flash("No check-out found for this reservation.", "warning")
             return redirect(url_for("my_reservations"))
-        if not user["is_admin"] and trip_log["user_id"] != eff_id:
-            abort(403)
 
         if request.method == "POST":
             time_str      = request.form.get("checkin_time", "").strip()
@@ -1035,7 +1043,7 @@ def register_routes(app: Flask):
                 email_notify.notify_password_reset(user, token)
             # Always show the same message to prevent account enumeration
             flash("If that account exists and has an email address, a reset link has been sent.", "info")
-            return redirect(url_for("login"))
+            return redirect(url_for("forgot_password"))
         return render_template("forgot_password.html")
 
     @app.route("/set-password/<token>", methods=["GET", "POST"])
@@ -1079,6 +1087,8 @@ def register_routes(app: Flask):
         text = request.form.get("feedback_text", "").strip()
         if not text:
             return jsonify({"ok": False, "error": "Feedback text is required."}), 400
+        if len(text) > 4000:
+            return jsonify({"ok": False, "error": "Feedback must be 4000 characters or fewer."}), 400
 
         file_bytes = None
         file_type  = None
