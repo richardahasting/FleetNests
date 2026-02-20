@@ -59,6 +59,14 @@
           <a class="nav-link {% if request.endpoint == 'help_page' %}active{% endif %}"
              href="{{ url_for('help_page') }}"><i class="bi bi-question-circle me-1"></i>Help</a>
         </li>
+        {% if current_user.can_manage_statements and not current_user.is_admin %}
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'admin_statements' %}active{% endif %}"
+             href="{{ url_for('admin_statements') }}">
+            <i class="bi bi-file-earmark-arrow-up me-1"></i>Upload Statement
+          </a>
+        </li>
+        {% endif %}
         {% if current_user.is_admin %}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle {% if 'admin' in request.endpoint %}active{% endif %}"
@@ -175,8 +183,8 @@
               Screenshot <span class="text-muted fw-normal">(optional)</span>
             </label>
             <input type="file" id="fbScreenshot" class="form-control"
-                   accept="image/jpeg,image/png,image/gif,image/webp">
-            <div class="form-text">JPEG, PNG, GIF, or WebP · max 5 MB</div>
+                   accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,.pdf">
+            <div class="form-text">JPEG, PNG, GIF, WebP, or PDF · max 5 MB</div>
           </div>
           <div id="fbErrorBanner" class="alert alert-danger py-2 d-none" role="alert"></div>
         </div>
