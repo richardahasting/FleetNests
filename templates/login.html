@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Login — FleetNests{% endblock %}
+{% block title %}Login — {{ club.name if club else 'FleetNests' }}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center mt-5">
@@ -8,9 +8,9 @@
       <div class="card-body p-4">
         <div class="text-center mb-4">
           <img src="{{ url_for('static', filename='images/badge.svg') }}"
-               class="login-brand-badge mb-3" alt="FleetNests"
+               class="login-brand-badge mb-3" alt="{{ club.name if club else 'FleetNests' }}"
                width="80" height="80" style="height:80px;width:80px">
-          <h4 class="fw-bold mb-1" style="color:var(--navy)">FleetNests</h4>
+          <h4 class="fw-bold mb-1" style="color:var(--navy)">{{ club.name if club else 'FleetNests' }}</h4>
           <p class="text-muted small mb-0">Member Reservation System</p>
         </div>
         <hr class="divider-gold">

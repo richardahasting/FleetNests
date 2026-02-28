@@ -124,11 +124,15 @@ def init_app(app: Flask):
 
         short_name = None
 
-        # 1. Subdomain
-        host = request.host or ""
-        short_name = _resolve_short_name(host)
+        # 1. Path-based header (Nginx sets X-Club-Short-Name for /sample1/, /sample2/ etc.)
+        short_name = request.headers.get("X-Club-Short-Name")
 
-        # 2. Env var override (dev / single-club mode)
+        # 2. Subdomain
+        if not short_name:
+            host = request.host or ""
+            short_name = _resolve_short_name(host)
+
+        # 3. Env var override (dev / single-club mode)
         if not short_name:
             short_name = os.environ.get("CLUB_SHORT_NAME")
 

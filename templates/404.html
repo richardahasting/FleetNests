@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Not Found — FleetNests{% endblock %}
+{% block title %}Not Found — {{ club.name if club else 'FleetNests' }}{% endblock %}
 {% block content %}
 <div class="text-center mt-5">
   <i class="bi bi-question-circle text-secondary" style="font-size:3rem"></i>
