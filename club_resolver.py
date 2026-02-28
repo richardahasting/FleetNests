@@ -55,8 +55,13 @@ def _build_dsn(club: dict) -> str:
       e.g. club_bentley_user → DB_PASS_CLUB_BENTLEY_USER
     Falls back to DATABASE_URL for backward-compat with single-club deploys.
     """
-    db_user = club["db_user"]
-    db_name = club["db_name"]
+    db_user = club.get("db_user")
+    db_name = club.get("db_name")
+
+    # Single-club mode: no per-club DB credentials, use DATABASE_URL directly
+    if not db_user:
+        return os.environ.get("DATABASE_URL", "")
+
     env_key = f"DB_PASS_{db_user.upper()}"
     password = os.environ.get(env_key)
 
@@ -70,9 +75,24 @@ def _build_dsn(club: dict) -> str:
 
 
 def _load_club(short_name: str) -> dict | None:
-    """Look up club from cache or master DB."""
+    """Look up club from cache, master DB, or DATABASE_URL (single-club mode)."""
     if short_name in _club_cache:
         return _club_cache[short_name]
+
+    # Single-club mode: no master DB configured, build a synthetic club dict
+    if not os.environ.get("MASTER_DATABASE_URL"):
+        club = {
+            "id": 1,
+            "short_name": short_name,
+            "name": os.environ.get("CLUB_NAME", "Bentley Boat Club"),
+            "db_name": None,
+            "db_user": None,
+            "vehicle_type": os.environ.get("VEHICLE_TYPE", "boat"),
+            "is_active": True,
+        }
+        _club_cache[short_name] = club
+        return club
+
     club = master_db.get_club_by_short_name(short_name)
     if club:
         _club_cache[short_name] = dict(club)

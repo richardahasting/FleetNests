@@ -1250,7 +1250,7 @@ def register_routes(app: Flask):
     # -- Admin branding & photos --------------------------------------------
 
     @app.route("/admin/branding", methods=["POST"])
-    @auth.require_admin
+    @auth.admin_required
     def admin_branding():
         """Update club colors and/or logo/hero images."""
         action = request.form.get("action", "")
@@ -1306,7 +1306,7 @@ def register_routes(app: Flask):
         return redirect(url_for("admin_settings"))
 
     @app.route("/admin/photos/upload", methods=["POST"])
-    @auth.require_admin
+    @auth.admin_required
     def admin_photo_upload():
         """Upload a gallery photo."""
         user = auth.current_user()
@@ -1329,7 +1329,7 @@ def register_routes(app: Flask):
         return redirect(url_for("admin_settings"))
 
     @app.route("/admin/photos/<int:photo_id>/delete", methods=["POST"])
-    @auth.require_admin
+    @auth.admin_required
     def admin_photo_delete(photo_id: int):
         """Delete a gallery photo."""
         models.delete_club_photo(photo_id)
@@ -1337,7 +1337,7 @@ def register_routes(app: Flask):
         return redirect(url_for("admin_settings"))
 
     @app.route("/admin/vehicle-photos/upload", methods=["POST"])
-    @auth.require_admin
+    @auth.admin_required
     def admin_vehicle_photo_upload():
         """Upload a vehicle photo."""
         ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
@@ -1360,14 +1360,14 @@ def register_routes(app: Flask):
         return redirect(url_for("admin_settings"))
 
     @app.route("/admin/vehicle-photos/<int:photo_id>/set-primary", methods=["POST"])
-    @auth.require_admin
+    @auth.admin_required
     def admin_vehicle_photo_set_primary(photo_id: int):
         models.set_primary_vehicle_photo(photo_id)
         flash("Primary vehicle photo updated.", "success")
         return redirect(url_for("admin_settings"))
 
     @app.route("/admin/vehicle-photos/<int:photo_id>/delete", methods=["POST"])
-    @auth.require_admin
+    @auth.admin_required
     def admin_vehicle_photo_delete(photo_id: int):
         models.delete_vehicle_photo(photo_id)
         flash("Vehicle photo deleted.", "success")
