@@ -1,25 +1,88 @@
 services:
-  db:
+
+  # ── Master registry database ──────────────────────────────────────────────
+  # Holds the clubs table, super_admins, subscriptions, vehicle_templates.
+  # Runs on port 5433 to avoid conflicts with any host PostgreSQL.
+  db-master:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: bentley_user
-      POSTGRES_PASSWORD: changeme
-      POSTGRES_DB: bentley_boat
+      POSTGRES_USER: clubreserve_admin
+      POSTGRES_PASSWORD: ${MASTER_DB_PASSWORD:-changeme-master}
+      POSTGRES_DB: clubreserve_master
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+      - master_data:/var/lib/postgresql/data
+      - ./init_master_db.sql:/docker-entrypoint-initdb.d/01-init_master_db.sql
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clubreserve_admin -d clubreserve_master"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # ── Per-club databases ────────────────────────────────────────────────────
+  # All club databases (club-bentley, club-skyview, …) live in this instance.
+  # provision_club() creates new PG users and databases here at runtime.
+  db-clubs:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pg_superuser
+      POSTGRES_PASSWORD: ${CLUBS_DB_PASSWORD:-changeme-clubs}
+      POSTGRES_DB: postgres
+    volumes:
+      - clubs_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pg_superuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Web application ───────────────────────────────────────────────────────
   web:
     build: .
     restart: unless-stopped
-    depends_on: [db]
+    depends_on:
+      db-master:
+        condition: service_healthy
+      db-clubs:
+        condition: service_healthy
     ports:
       - "5210:5210"
     environment:
-      DATABASE_URL: postgresql://bentley_user:changeme@db/bentley_boat
-      SECRET_KEY: change-me-in-production
+      # Master DB — club registry, super-admins
+      MASTER_DATABASE_URL: postgresql://clubreserve_admin:${MASTER_DB_PASSWORD:-changeme-master}@db-master/clubreserve_master
+
+      # Club DB host — used by provision_club() to create new DBs
+      PG_HOST: db-clubs
+      PG_PORT: 5432
+      PG_SUPERUSER: pg_superuser
+      PG_SUPERUSER_PASSWORD: ${CLUBS_DB_PASSWORD:-changeme-clubs}
+
+      # Per-club DB credentials (add one per provisioned club)
+      # Format: DB_PASS_<DB_USER_UPPER> where DB_USER is e.g. club_bentley_user
+      DB_PASS_CLUB_BENTLEY_USER: ${DB_PASS_CLUB_BENTLEY_USER:-changeme-bentley}
+
+      # Single-club dev mode: bypass subdomain resolution
+      # CLUB_SHORT_NAME: bentley
+
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
       APP_PREFIX: /
 
+      # Email (optional)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+
+      # GitHub issue reporting for feedback (optional)
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_REPO: ${GITHUB_REPO:-}
+
 volumes:
-  postgres_data:
+  master_data:
+  clubs_data:

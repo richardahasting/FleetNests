@@ -1,0 +1,99 @@
+{% extends "superadmin/base.html" %}
+{% block title %}Clubs — ClubReserve Super Admin{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="mb-0 fw-bold">
+      <i class="bi bi-grid me-2" style="color:#9b59b6;"></i>Clubs
+    </h4>
+    <div class="text-muted small">All registered clubs on this instance</div>
+  </div>
+  <a href="{{ url_for('superadmin_new_club') }}" class="btn btn-sm"
+     style="background:#9b59b6;border-color:#8e44ad;color:#fff;">
+    <i class="bi bi-plus-circle me-1"></i>New Club
+  </a>
+</div>
+
+{% if clubs %}
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Club Name</th>
+          <th>Short Name</th>
+          <th class="text-center">Type</th>
+          <th>Subdomain</th>
+          <th>Database</th>
+          <th class="text-center">Status</th>
+          <th>Provisioned</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for club in clubs %}
+        <tr>
+          <td class="fw-semibold">{{ club.name }}</td>
+          <td><code>{{ club.short_name }}</code></td>
+          <td class="text-center">
+            {% if club.vehicle_type == 'plane' %}
+              <span class="badge bg-info text-dark">
+                <i class="bi bi-airplane me-1"></i>Plane
+              </span>
+            {% else %}
+              <span class="badge bg-primary">
+                <i class="bi bi-water me-1"></i>Boat
+              </span>
+            {% endif %}
+          </td>
+          <td class="text-muted small">{{ club.subdomain or club.short_name }}.clubreserve.com</td>
+          <td class="text-muted small"><code>{{ club.db_name }}</code></td>
+          <td class="text-center">
+            {% if club.is_active %}
+              <span class="badge bg-success">Active</span>
+            {% else %}
+              <span class="badge bg-secondary">Inactive</span>
+            {% endif %}
+          </td>
+          <td class="text-muted small text-nowrap">
+            {{ club.created_at.strftime('%b %d, %Y') if club.created_at else '—' }}
+          </td>
+          <td class="text-end">
+            {% if club.is_active %}
+            <form method="post"
+                  action="{{ url_for('superadmin_deactivate_club', club_id=club.id) }}"
+                  onsubmit="return confirm('Deactivate {{ club.name }}? Members will lose access.');">
+              <button type="submit" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-pause-circle me-1"></i>Deactivate
+              </button>
+            </form>
+            {% else %}
+            <span class="text-muted small">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="text-muted small mt-3">
+  {{ clubs|length }} club{{ 's' if clubs|length != 1 else '' }} registered
+</div>
+
+{% else %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-grid fs-2 d-block mb-2"></i>
+    No clubs provisioned yet.
+    <div class="mt-2">
+      <a href="{{ url_for('superadmin_new_club') }}">Provision your first club</a>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

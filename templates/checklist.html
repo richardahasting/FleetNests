@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Captain's Checklist — Bentley Boat Club{% endblock %}
+{% block title %}{{ CHECKLIST_NAME }} — {{ club.name if club else 'ClubReserve' }}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -7,7 +7,7 @@
 
     <div class="d-flex align-items-center justify-content-between mb-4">
       <h5 class="mb-0 fw-bold">
-        <i class="bi bi-clipboard2-check me-2 text-club-blue"></i>Captain's Checklist
+        <i class="bi bi-clipboard2-check me-2 text-club-blue"></i>{{ CHECKLIST_NAME }}
       </h5>
       <div class="d-flex gap-2 d-print-none">
         <button class="btn btn-sm btn-outline-secondary" onclick="window.print()">
@@ -19,14 +19,11 @@
       </div>
     </div>
 
+    {% if DISCLAIMER %}
     <div class="alert alert-warning border-warning mb-4">
-      <p class="fw-bold mb-1">{{ DISCLAIMER }}</p>
-      <p class="fw-bold mb-0">
-        NO SUCH THING AS DRIVING TOO SLOW AROUND THE MARINA &amp; SLIPS.
-        USE A PASSENGER &amp; THE PUSH POLE TO ASSIST AROUND THE BOAT SLIP,
-        ESPECIALLY WHEN DOCKING.
-      </p>
+      <p class="fw-bold mb-0">{{ DISCLAIMER }}</p>
     </div>
+    {% endif %}
 
     <div class="alert alert-info border-0 shadow-sm mb-3 d-print-none small">
       <i class="bi bi-info-circle me-1"></i>
@@ -47,18 +44,20 @@
             <input class="form-check-input border-2" type="checkbox" id="{{ item_id }}"
                    style="width:1.2rem;height:1.2rem;margin-top:0.15rem">
             <label class="form-check-label small ms-2" for="{{ item_id }}">
-              <strong>{{ loop.index }}.</strong> {{ CAPTAIN_CHECKLIST[idx] }}
+              <strong>{{ loop.index }}.</strong> {{ CHECKLIST_ITEMS[idx] }}
             </label>
           </div>
           {% endfor %}
         </div>
         {% endfor %}
       </div>
+      {% if CONTACT_PHONE %}
       <div class="card-footer bg-transparent small">
         <i class="bi bi-telephone-fill me-1 text-danger"></i>
-        <strong>Emergency: Call Marina at <a href="tel:8302557442">{{ MARINA_PHONE }}</a></strong>
-        &nbsp;·&nbsp; <strong>CAPTAIN IS IN CHARGE. SAFETY IS NO ACCIDENT.</strong>
+        <strong>Emergency: Call {{ CONTACT_PHONE_LABEL }} at <a href="tel:{{ CONTACT_PHONE|replace('-','') }}">{{ CONTACT_PHONE }}</a></strong>
+        &nbsp;·&nbsp; <strong>SAFETY IS NO ACCIDENT.</strong>
       </div>
+      {% endif %}
     </div>
 
     <div class="d-print-none mb-4">

@@ -1,0 +1,161 @@
+{% extends "superadmin/base.html" %}
+{% block title %}New Club — ClubReserve Super Admin{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-6">
+
+    <div class="d-flex align-items-center mb-4">
+      <a href="{{ url_for('superadmin_dashboard') }}" class="btn btn-sm btn-outline-secondary me-3">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <div>
+        <h4 class="mb-0 fw-bold">
+          <i class="bi bi-plus-circle me-2" style="color:#9b59b6;"></i>Provision New Club
+        </h4>
+        <div class="text-muted small">Creates a new club database and seeds default settings</div>
+      </div>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger">
+      <i class="bi bi-exclamation-circle me-1"></i>{{ error }}
+    </div>
+    {% endif %}
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <form method="post" id="provisionForm">
+
+          <div class="mb-3">
+            <label for="name" class="form-label fw-semibold">
+              Club Name <span class="text-danger">*</span>
+            </label>
+            <input type="text" class="form-control" id="name" name="name"
+                   placeholder="e.g. Bentley Boat Club"
+                   value="{{ form.name or '' }}" required autofocus>
+            <div class="form-text">Full display name shown to members.</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="short_name" class="form-label fw-semibold">
+              Short Name <span class="text-danger">*</span>
+            </label>
+            <div class="input-group">
+              <input type="text" class="form-control" id="short_name" name="short_name"
+                     placeholder="e.g. bentley"
+                     pattern="[a-z0-9\-]+" maxlength="32"
+                     value="{{ form.short_name or '' }}" required>
+              <span class="input-group-text text-muted small">.clubreserve.com</span>
+            </div>
+            <div class="form-text">
+              Lowercase letters, numbers, hyphens only. Used for subdomain and database name.
+              <strong>Cannot be changed after provisioning.</strong>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              Vehicle Type <span class="text-danger">*</span>
+            </label>
+            <div class="d-flex gap-3">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="vehicle_type"
+                       id="type_boat" value="boat"
+                       {% if not form.vehicle_type or form.vehicle_type == 'boat' %}checked{% endif %}>
+                <label class="form-check-label" for="type_boat">
+                  <i class="bi bi-water me-1 text-primary"></i>Boat Club
+                </label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="vehicle_type"
+                       id="type_plane" value="plane"
+                       {% if form.vehicle_type == 'plane' %}checked{% endif %}>
+                <label class="form-check-label" for="type_plane">
+                  <i class="bi bi-airplane me-1 text-info"></i>Flying Club
+                </label>
+              </div>
+            </div>
+            <div class="form-text">
+              Determines default checklist, weather alerts, and UI labels.
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="contact_email" class="form-label fw-semibold">Contact Email</label>
+            <input type="email" class="form-control" id="contact_email" name="contact_email"
+                   placeholder="admin@myclub.com"
+                   value="{{ form.contact_email or '' }}">
+            <div class="form-text">Club administrator email for system notifications.</div>
+          </div>
+
+          <div class="mb-4">
+            <label for="timezone" class="form-label fw-semibold">Timezone</label>
+            <select class="form-select" id="timezone" name="timezone">
+              {% set tzs = [
+                ('America/Chicago',    'Central Time (US)'),
+                ('America/New_York',   'Eastern Time (US)'),
+                ('America/Denver',     'Mountain Time (US)'),
+                ('America/Los_Angeles','Pacific Time (US)'),
+                ('America/Phoenix',    'Arizona (no DST)'),
+                ('America/Anchorage',  'Alaska'),
+                ('Pacific/Honolulu',   'Hawaii'),
+                ('UTC',                'UTC'),
+              ] %}
+              {% for tz_val, tz_label in tzs %}
+              <option value="{{ tz_val }}"
+                      {% if (form.timezone or 'America/Chicago') == tz_val %}selected{% endif %}>
+                {{ tz_label }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="alert alert-warning small">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            This will <strong>create a PostgreSQL database and user</strong> named
+            <code id="dbPreview">club-{short_name}</code>. This action cannot be undone.
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn"
+                    style="background:#9b59b6;border-color:#8e44ad;color:#fff;">
+              <i class="bi bi-database-add me-1"></i>Provision Club
+            </button>
+            <a href="{{ url_for('superadmin_dashboard') }}" class="btn btn-outline-secondary">
+              Cancel
+            </a>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Live preview of short_name → db name
+const shortInput = document.getElementById('short_name');
+const dbPreview  = document.getElementById('dbPreview');
+
+shortInput.addEventListener('input', function () {
+  const val = this.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+  dbPreview.textContent = val ? 'club-' + val : 'club-{short_name}';
+});
+
+// Auto-populate short_name from club name
+document.getElementById('name').addEventListener('blur', function () {
+  if (!shortInput.value) {
+    const slug = this.value.trim().toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .substring(0, 32);
+    shortInput.value = slug;
+    dbPreview.textContent = slug ? 'club-' + slug : 'club-{short_name}';
+  }
+});
+</script>
+{% endblock %}

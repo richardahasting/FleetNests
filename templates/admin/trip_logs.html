@@ -22,7 +22,7 @@
               <th>Member</th>
               <th>Checked Out</th>
               <th>Checked In</th>
-              <th class="text-center">Hours Used</th>
+              <th class="text-center">{{ HOURS_LABEL }} Used</th>
               <th class="text-center">Fuel Added</th>
               <th class="text-center">Status</th>
             </tr>
@@ -39,20 +39,20 @@
               </td>
               <td class="text-nowrap">
                 {{ log.checkout_time.strftime('%-I:%M %p') if log.checkout_time else '—' }}
-                {% if log.motor_hours_out is not none %}
-                <div class="text-muted small">{{ "%.1f"|format(log.motor_hours_out) }} hrs</div>
+                {% if log.primary_hours_out is not none %}
+                <div class="text-muted small">{{ "%.1f"|format(log.primary_hours_out) }} hrs</div>
                 {% endif %}
               </td>
               <td class="text-nowrap">
                 {{ log.checkin_time.strftime('%-I:%M %p') if log.checkin_time else '—' }}
-                {% if log.motor_hours_in is not none %}
-                <div class="text-muted small">{{ "%.1f"|format(log.motor_hours_in) }} hrs</div>
+                {% if log.primary_hours_in is not none %}
+                <div class="text-muted small">{{ "%.1f"|format(log.primary_hours_in) }} hrs</div>
                 {% endif %}
               </td>
               <td class="text-center">
-                {% if log.motor_hours_out is not none and log.motor_hours_in is not none %}
+                {% if log.primary_hours_out is not none and log.primary_hours_in is not none %}
                   <span class="fw-semibold">
-                    {{ "%.1f"|format(log.motor_hours_in - log.motor_hours_out) }}
+                    {{ "%.1f"|format(log.primary_hours_in - log.primary_hours_out) }}
                   </span>
                 {% else %}
                   <span class="text-muted">—</span>

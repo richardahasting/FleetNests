@@ -5,3 +5,4 @@ __pycache__/
 gunicorn.ctl
 runme.sh
 runme.complete
+.playwright-mcp/
