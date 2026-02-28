@@ -1,5 +1,5 @@
 """
-AI-routed member feedback for Bentley Boat Club.
+AI-routed member feedback for FleetNests.
 
 process_feedback(user, text, image_bytes, image_content_type) -> (bool, str)
 
@@ -25,7 +25,7 @@ UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "static", "feedback_uploads")
 
 _PROMPT = """\
-You are the feedback assistant for Bentley Boat Club, a private boating club.
+You are the feedback assistant for FleetNests, a reservation platform.
 A logged-in member has submitted feedback through the app. Triage it and decide
 where to route it.
 
@@ -166,8 +166,8 @@ def _create_github_issue(title: str, body: str, labels: list,
                           saved_path: str | None) -> tuple[str | None, bool]:
     """Returns (issue_url, success)."""
     token = os.environ.get("GITHUB_TOKEN")
-    repo  = os.environ.get("GITHUB_REPO", "richardahasting/bentley-boat")
-    app_url = os.environ.get("APP_URL", "https://bentleyboatclub.com")
+    repo  = os.environ.get("GITHUB_REPO", "richardahasting/fleetnests")
+    app_url = os.environ.get("APP_URL", "https://fleetnests.com")
     if not token:
         log.error("GITHUB_TOKEN not set; cannot create GitHub issue: %s", title)
         return None, False
@@ -210,7 +210,7 @@ def _create_github_issue(title: str, body: str, labels: list,
 def _send_email(subject: str, body: str, saved_path: str | None = None) -> bool:
     import email_notify
     to_addr = os.environ.get("FEEDBACK_EMAIL", "")
-    app_url = os.environ.get("APP_URL", "https://bentleyboatclub.com")
+    app_url = os.environ.get("APP_URL", "https://fleetnests.com")
     full_body = body
     if saved_path:
         full_body += f"\n\nAttachment: {app_url}/static/{saved_path}"

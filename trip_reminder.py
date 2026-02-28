@@ -6,7 +6,7 @@ Emails any member with a reservation tomorrow so they can review
 the Captain's Checklist and prepare for their trip.
 
 Cron entry (runs at 6 PM daily):
-  0 18 * * * /usr/bin/python3 /home/richard/projects/bentley-boat/trip_reminder.py >> /var/log/bentley-trip-reminder.log 2>&1
+  0 18 * * * /usr/bin/python3 /home/richard/projects/fleetnests/trip_reminder.py >> /var/log/bentley-trip-reminder.log 2>&1
 """
 
 import os

@@ -1,4 +1,4 @@
--- ClubReserve — Club Database Schema
+-- FleetNests — Club Database Schema
 -- Replaces init_db.sql for multi-tenant use.
 -- Run once per club after creating the club database:
 --   psql -U club_{shortname}_user -d club-{shortname} -f init_club_db.sql

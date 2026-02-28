@@ -1,5 +1,5 @@
 """
-Vehicle-type constants and context builders for ClubReserve.
+Vehicle-type constants and context builders for FleetNests.
 
 All the constants that were hardcoded in models.py (CAPTAIN_CHECKLIST,
 FUEL_LEVELS, MARINA_PHONE, etc.) now live here and are parameterized

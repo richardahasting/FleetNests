@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Calendar — Bentley Boat Club{% endblock %}
+{% block title %}Calendar — FleetNests{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
@@ -9,10 +9,10 @@
 {# Hero banner — shows club hero image or a gradient fallback #}
 <div class="club-hero mb-3 rounded-3 overflow-hidden shadow-sm">
   {% if branding.hero_data %}
-  <img src="{{ url_for('club_hero') }}" alt="{{ club.name if club else 'ClubReserve' }}">
+  <img src="{{ url_for('club_hero') }}" alt="{{ club.name if club else 'FleetNests' }}">
   {% endif %}
   <div class="{{ 'club-hero-overlay' if branding.hero_data else 'club-hero-gradient' }}">
-    <h2 class="club-hero-title">{{ club.name if club else 'ClubReserve' }}</h2>
+    <h2 class="club-hero-title">{{ club.name if club else 'FleetNests' }}</h2>
   </div>
 </div>
 

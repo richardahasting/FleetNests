@@ -1,5 +1,5 @@
 """
-Database connection module for ClubReserve.
+Database connection module for FleetNests.
 
 Supports per-request DSN switching for multi-tenant operation:
   - club_resolver.py calls set_club_dsn(dsn) in before_request

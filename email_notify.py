@@ -1,5 +1,5 @@
 """
-Email notifications for ClubReserve.
+Email notifications for FleetNests.
 Uses local Postfix (localhost:25) — no SMTP auth needed on same server.
 Activate by setting EMAIL_ENABLED=true in .env.
 
@@ -25,9 +25,9 @@ def _get_club_context() -> dict:
         if club:
             vehicle_type = club.get("vehicle_type", "boat")
             club_name    = club.get("name", "Club")
-            app_url      = os.environ.get("APP_URL", "https://clubreserve.com")
+            app_url      = os.environ.get("APP_URL", "https://fleetnests.com")
             email_from   = os.environ.get("EMAIL_FROM",
-                                          f"noreply@{club.get('subdomain', 'club')}.clubreserve.com")
+                                          f"noreply@{club.get('subdomain', 'club')}.fleetnests.com")
             return {
                 "club_name":     club_name,
                 "vehicle_type":  vehicle_type,
@@ -48,9 +48,9 @@ def _get_club_context() -> dict:
         "vehicle_noun":   "boat",
         "checklist_name": "Captain's Checklist",
         "vehicle_label":  "boat",
-        "app_url":        os.environ.get("APP_URL", "https://clubreserve.com"),
-        "email_from":     os.environ.get("EMAIL_FROM", "noreply@clubreserve.com"),
-        "signature":      "— ClubReserve",
+        "app_url":        os.environ.get("APP_URL", "https://fleetnests.com"),
+        "email_from":     os.environ.get("EMAIL_FROM", "noreply@fleetnests.com"),
+        "signature":      "— FleetNests",
     }
 
 

@@ -1,7 +1,7 @@
 {
-  "name": "Bentley Boat Club",
+  "name": "FleetNests",
   "short_name": "BoatClub",
-  "description": "Boat reservation system for Bentley Boat Club members",
+  "description": "Reservation platform for FleetNests members",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#F4F0E8",

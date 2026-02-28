@@ -1,8 +1,8 @@
 """
-Per-request club resolution for ClubReserve.
+Per-request club resolution for FleetNests.
 
 Resolution order (first match wins):
-  1. Subdomain: bentley.clubreserve.com  → short_name = "bentley"
+  1. Subdomain: bentley.fleetnests.com  → short_name = "bentley"
   2. URL prefix: /bentley/calendar       → short_name = "bentley"  (not yet wired)
   3. CLUB_SHORT_NAME env var             → single-club dev / legacy mode
 
@@ -30,11 +30,11 @@ def _resolve_short_name(host: str) -> str | None:
     """
     Extract a club short_name from the Host header.
     Matches patterns like:
-      bentley.clubreserve.com   → "bentley"
+      bentley.fleetnests.com   → "bentley"
       bentley.localhost         → "bentley"
-      bentley.clubreserve.local → "bentley"
+      bentley.fleetnests.local → "bentley"
 
-    Returns None if the host is bare (clubreserve.com, localhost, etc.).
+    Returns None if the host is bare (fleetnests.com, localhost, etc.).
     """
     # Strip port if present
     host_only = host.split(":")[0].lower()
@@ -84,7 +84,7 @@ def _load_club(short_name: str) -> dict | None:
         club = {
             "id": 1,
             "short_name": short_name,
-            "name": os.environ.get("CLUB_NAME", "Bentley Boat Club"),
+            "name": os.environ.get("CLUB_NAME", "FleetNests"),
             "db_name": None,
             "db_user": None,
             "vehicle_type": os.environ.get("VEHICLE_TYPE", "boat"),

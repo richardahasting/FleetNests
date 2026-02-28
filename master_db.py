@@ -1,6 +1,6 @@
 """
-Master database connection and query functions for ClubReserve.
-Connects to the clubreserve_master database for club registry, super-admins,
+Master database connection and query functions for FleetNests.
+Connects to the fleetnests_master database for club registry, super-admins,
 billing, and shared templates.
 
 Independent of club-specific databases — all club data lives in club_resolver.py / db.py.

@@ -1,5 +1,5 @@
 {% extends "superadmin/base.html" %}
-{% block title %}Clubs — ClubReserve Super Admin{% endblock %}
+{% block title %}Clubs — FleetNests Super Admin{% endblock %}
 
 {% block content %}
 
@@ -48,7 +48,7 @@
               </span>
             {% endif %}
           </td>
-          <td class="text-muted small">{{ club.subdomain or club.short_name }}.clubreserve.com</td>
+          <td class="text-muted small">{{ club.subdomain or club.short_name }}.fleetnests.com</td>
           <td class="text-muted small"><code>{{ club.db_name }}</code></td>
           <td class="text-center">
             {% if club.is_active %}

@@ -6,7 +6,7 @@ Checks NWS alerts for Canyon Lake and emails any member with a reservation
 in the next 48 hours if hazardous conditions are active.
 
 Cron entry (runs at 6 AM daily):
-  0 6 * * * /usr/bin/python3 /home/richard/projects/bentley-boat/weather_check.py >> /var/log/bentley-weather.log 2>&1
+  0 6 * * * /usr/bin/python3 /home/richard/projects/fleetnests/weather_check.py >> /var/log/bentley-weather.log 2>&1
 """
 
 import os

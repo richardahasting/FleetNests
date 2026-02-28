@@ -1,4 +1,4 @@
-# ClubReserve
+# FleetNests
 
 A multi-tenant reservation platform for boat and flying clubs. One Flask application
 serves any number of clubs, each with full isolation — separate PostgreSQL database,
@@ -33,15 +33,15 @@ subdomain routing, and configurable vehicle type (boat or plane).
 
 | Service | Port | Database | Purpose |
 |---------|------|----------|---------|
-| `db-master` | 5433 | `clubreserve_master` | Club registry, super-admins, vehicle templates |
+| `db-master` | 5433 | `fleetnests_master` | Club registry, super-admins, vehicle templates |
 | `db-clubs` | 5434 | `club-<shortname>` (one per club) | All per-club data |
 
 ### Per-Request Club Resolution
 
 `club_resolver.py` runs as a Flask `before_request` hook:
 
-1. Extracts the subdomain from the incoming request (`bentley.clubreserve.com` → `bentley`)
-2. Looks up the club in `clubreserve_master`
+1. Extracts the subdomain from the incoming request (`bentley.fleetnests.com` → `bentley`)
+2. Looks up the club in `fleetnests_master`
 3. Stores the club record and its DSN on Flask `g`
 
 `CLUB_SHORT_NAME` env var bypasses subdomain lookup for local dev.
@@ -64,8 +64,8 @@ contact phone label, checklist items) for the current club's vehicle type.
 ## Quick Start (Docker)
 
 ```bash
-git clone https://github.com/richardahasting/bentley-boat.git ClubReserve
-cd ClubReserve
+git clone https://github.com/richardahasting/bentley-boat.git FleetNests
+cd FleetNests
 cp .env.example .env        # fill in all values before proceeding
 docker compose up -d
 ```
@@ -99,7 +99,7 @@ CLUB_SHORT_NAME=bentley python app.py
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `MASTER_DATABASE_URL` | **Yes** | DSN for `clubreserve_master` (club registry) |
+| `MASTER_DATABASE_URL` | **Yes** | DSN for `fleetnests_master` (club registry) |
 | `MASTER_DB_PASSWORD` | Docker | Password for master DB (used in compose) |
 | `PG_HOST` | **Yes** | Host of the clubs PostgreSQL instance |
 | `PG_PORT` | No (5434) | Port of the clubs PostgreSQL instance |
@@ -143,7 +143,7 @@ CLUB_SHORT_NAME=bentley python app.py
 ## Project Structure
 
 ```
-ClubReserve/
+FleetNests/
 ├── app.py              # Flask routes and view logic (1,244 lines)
 ├── models.py           # Per-club DB query layer / business logic (1,018 lines)
 ├── auth.py             # Session auth, login_required, superadmin_required (170 lines)
@@ -173,7 +173,7 @@ ClubReserve/
 
 ## Database Schema
 
-### Master DB (`clubreserve_master`)
+### Master DB (`fleetnests_master`)
 
 | Table | Purpose |
 |-------|---------|
@@ -218,10 +218,10 @@ ClubReserve/
 
 ```cron
 # Weather alerts — 6 AM daily
-0  6 * * *  /usr/bin/python3 /path/to/weather_check.py  >> /var/log/clubreserve-weather.log 2>&1
+0  6 * * *  /usr/bin/python3 /path/to/weather_check.py  >> /var/log/fleetnests-weather.log 2>&1
 
 # Trip reminders — 6 PM daily
-0 18 * * *  /usr/bin/python3 /path/to/trip_reminder.py  >> /var/log/clubreserve-reminder.log 2>&1
+0 18 * * *  /usr/bin/python3 /path/to/trip_reminder.py  >> /var/log/fleetnests-reminder.log 2>&1
 ```
 
 Both scripts load `.env` via `python-dotenv` and connect directly to PostgreSQL.
@@ -242,5 +242,5 @@ gunicorn --config gunicorn.conf.py app:app
 ```
 
 Nginx should proxy to `http://127.0.0.1:5210`. For multi-tenant subdomain routing,
-configure a wildcard DNS record (`*.clubreserve.com → server IP`) and a wildcard
+configure a wildcard DNS record (`*.fleetnests.com → server IP`) and a wildcard
 `server_name` in Nginx.

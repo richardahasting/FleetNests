@@ -1,5 +1,5 @@
 {% extends "superadmin/base.html" %}
-{% block title %}New Club — ClubReserve Super Admin{% endblock %}
+{% block title %}New Club — FleetNests Super Admin{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -32,7 +32,7 @@
               Club Name <span class="text-danger">*</span>
             </label>
             <input type="text" class="form-control" id="name" name="name"
-                   placeholder="e.g. Bentley Boat Club"
+                   placeholder="e.g. FleetNests"
                    value="{{ form.name or '' }}" required autofocus>
             <div class="form-text">Full display name shown to members.</div>
           </div>
@@ -46,7 +46,7 @@
                      placeholder="e.g. bentley"
                      pattern="[a-z0-9\-]+" maxlength="32"
                      value="{{ form.short_name or '' }}" required>
-              <span class="input-group-text text-muted small">.clubreserve.com</span>
+              <span class="input-group-text text-muted small">.fleetnests.com</span>
             </div>
             <div class="form-text">
               Lowercase letters, numbers, hyphens only. Used for subdomain and database name.

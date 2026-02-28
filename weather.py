@@ -1,5 +1,5 @@
 """
-Weather alert checker for ClubReserve.
+Weather alert checker for FleetNests.
 
 Supports two modes based on vehicle type:
   boat  → NWS zone/county alerts (existing logic, parameterized)
@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 NWS_ALERTS_URL = "https://api.weather.gov/alerts/active?zone={zone}"
 METAR_URL = "https://aviationweather.gov/api/data/metar?ids={station}&format=json"
 
-USER_AGENT = "ClubReserve/1.0 admin@clubreserve.com"
+USER_AGENT = "FleetNests/1.0 admin@fleetnests.com"
 
 
 # ---------------------------------------------------------------------------

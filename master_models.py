@@ -1,5 +1,5 @@
 """
-Club provisioning workflow for ClubReserve.
+Club provisioning workflow for FleetNests.
 
 provision_club() is the single entry point for creating a new club:
   1. Derive db_name and db_user from short_name

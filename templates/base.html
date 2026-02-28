@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{{ club.name if club else 'ClubReserve' }}{% endblock %}</title>
+  <title>{% block title %}{{ club.name if club else 'FleetNests' }}{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap">
@@ -34,9 +34,9 @@
   <div class="container-fluid">
     <a class="navbar-brand" href="{{ url_for('calendar') }}">
       <img src="{{ url_for('club_logo') }}"
-           class="brand-badge" alt="{{ club.name if club else 'ClubReserve' }}"
+           class="brand-badge" alt="{{ club.name if club else 'FleetNests' }}"
            width="34" height="34" style="height:34px;width:auto;max-width:120px;flex-shrink:0">
-      {{ club.name if club else 'ClubReserve' }}
+      {{ club.name if club else 'FleetNests' }}
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
       <span class="navbar-toggler-icon"></span>

@@ -1,6 +1,6 @@
 """
-ClubReserve — Multi-club, multi-vehicle reservation platform.
-Forked from bentley-boat. Multi-tenant via subdomain routing.
+FleetNests — Multi-club, multi-vehicle reservation platform.
+Forked from fleetnests. Multi-tenant via subdomain routing.
 """
 
 import os
@@ -696,7 +696,7 @@ def register_routes(app: Flask):
         for r in reservations:
             def fmt(dt):
                 return dt.strftime("%Y%m%dT%H%M%S")
-            uid = f"res-{r['id']}@clubreserve"
+            uid = f"res-{r['id']}@fleetnests"
             lines += [
                 "BEGIN:VEVENT",
                 f"UID:{uid}",

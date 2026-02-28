@@ -1,5 +1,5 @@
 """
-Authentication helpers for ClubReserve.
+Authentication helpers for FleetNests.
 Session-based auth with bcrypt password hashing.
 Supports both club-level users and super-admins (master DB).
 No Flask-Login dependency.

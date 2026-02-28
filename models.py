@@ -1,5 +1,5 @@
 """
-Database query functions for ClubReserve.
+Database query functions for FleetNests.
 All business logic lives here. Vehicle-type constants moved to vehicle_types.py.
 """
 

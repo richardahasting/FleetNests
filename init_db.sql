@@ -1,4 +1,4 @@
--- Bentley Boat Club — Database Schema
+-- FleetNests — Database Schema
 -- Run once after creating the database:
 --   psql -U bentley_user -d bentley_boat -f init_db.sql
 

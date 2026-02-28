@@ -1,6 +1,6 @@
--- ClubReserve Master Database Schema
+-- FleetNests Master Database Schema
 -- Run once after creating the database:
---   psql -U clubreserve_admin -d clubreserve_master -f init_master_db.sql
+--   psql -U fleetnests_admin -d fleetnests_master -f init_master_db.sql
 
 CREATE TABLE IF NOT EXISTS clubs (
     id            SERIAL PRIMARY KEY,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS clubs (
     vehicle_type  VARCHAR(10) NOT NULL DEFAULT 'boat' CHECK (vehicle_type IN ('boat', 'plane')),
     db_name       VARCHAR(63) NOT NULL,          -- PostgreSQL database name: club-{short_name}
     db_user       VARCHAR(63) NOT NULL,          -- PostgreSQL user: club_{short_name}_user
-    subdomain     VARCHAR(63),                   -- e.g. bentley -> bentley.clubreserve.com
+    subdomain     VARCHAR(63),                   -- e.g. bentley -> bentley.fleetnests.com
     contact_email VARCHAR(100),
     timezone      VARCHAR(50) DEFAULT 'America/Chicago',
     is_active     BOOLEAN DEFAULT TRUE,
@@ -65,7 +65,7 @@ CREATE INDEX IF NOT EXISTS idx_subs_club         ON subscriptions(club_id);
 CREATE INDEX IF NOT EXISTS idx_master_audit_time ON master_audit_log(created_at);
 
 -- -------------------------------------------------------------------------
--- Seed: Default boat checklist (Bentley Boat Club 8 items)
+-- Seed: Default boat checklist (FleetNests 8 items)
 -- -------------------------------------------------------------------------
 INSERT INTO vehicle_templates (vehicle_type, name, checklist_items, categories, disclaimer, is_default)
 VALUES (
@@ -124,13 +124,13 @@ ON CONFLICT DO NOTHING;
 -- -------------------------------------------------------------------------
 INSERT INTO clubs (name, short_name, vehicle_type, db_name, db_user, subdomain, contact_email, timezone)
 VALUES (
-    'Bentley Boat Club',
+    'FleetNests',
     'bentley',
     'boat',
     'club-bentley',
     'club_bentley_user',
     'bentley',
-    'admin@bentleyboatclub.com',
+    'admin@fleetnests.com',
     'America/Chicago'
 )
 ON CONFLICT (short_name) DO NOTHING;
