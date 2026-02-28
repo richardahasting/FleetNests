@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Club Settings — Admin{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+
+    <div class="d-flex align-items-center mb-4">
+      <h5 class="mb-0 fw-bold">
+        <i class="bi bi-gear me-2 text-club-blue"></i>Club Settings
+      </h5>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+          {{ msg }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="post">
+
+      {# ---- Trip Logging ---- #}
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent fw-semibold">
+          <i class="bi bi-speedometer2 me-2 text-club-blue"></i>Trip Logging
+        </div>
+        <div class="card-body p-4">
+
+          <div class="mb-3 d-flex align-items-center gap-3">
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" role="switch"
+                     name="has_hours_meter" id="has_hours_meter"
+                     {% if settings.get('has_hours_meter', 'true' if vehicle_type == 'plane' else 'false') == 'true' %}checked{% endif %}>
+              <label class="form-check-label fw-semibold" for="has_hours_meter">
+                Hours Meter
+              </label>
+            </div>
+            <small class="text-muted">Show engine/Hobbs hours fields on checkout and check-in</small>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="hours_label">Hours Label</label>
+            <input type="text" class="form-control" name="hours_label" id="hours_label"
+                   value="{{ settings.get('hours_label', '') }}"
+                   placeholder="{{ default_hours_label }}">
+            <div class="form-text">Leave blank to use the default for this vehicle type
+              (<em>{{ default_hours_label }}</em>).</div>
+          </div>
+
+          <div class="mb-3 d-flex align-items-center gap-3">
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" role="switch"
+                     name="has_fuel_level_enum" id="has_fuel_level_enum"
+                     {% if settings.get('has_fuel_level_enum', 'true' if vehicle_type == 'boat' else 'false') == 'true' %}checked{% endif %}>
+              <label class="form-check-label fw-semibold" for="has_fuel_level_enum">
+                Fuel Level Selector
+              </label>
+            </div>
+            <small class="text-muted">Show E/¼/½/¾/Full buttons at checkout</small>
+          </div>
+
+          <div class="d-flex align-items-center gap-3">
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" role="switch"
+                     name="fuel_required_on_return" id="fuel_required_on_return"
+                     {% if settings.get('fuel_required_on_return', 'true' if vehicle_type == 'plane' else 'false') == 'true' %}checked{% endif %}>
+              <label class="form-check-label fw-semibold" for="fuel_required_on_return">
+                Fuel Gallons Required on Return
+              </label>
+            </div>
+            <small class="text-muted">Make the "Fuel Added (gal)" field mandatory at check-in</small>
+          </div>
+
+        </div>
+      </div>
+
+      {# ---- Operations ---- #}
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent fw-semibold">
+          <i class="bi bi-sliders me-2 text-club-blue"></i>Operations
+        </div>
+        <div class="card-body p-4">
+
+          <div class="mb-3 d-flex align-items-center gap-3">
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" role="switch"
+                     name="approval_required" id="approval_required"
+                     {% if settings.get('approval_required') == 'true' %}checked{% endif %}>
+              <label class="form-check-label fw-semibold" for="approval_required">
+                Approval Required
+              </label>
+            </div>
+            <small class="text-muted">Reservations require admin approval before they are confirmed</small>
+          </div>
+
+          <div class="mb-0">
+            <label class="form-label" for="contact_phone">
+              {% if vehicle_type == 'plane' %}FBO Phone{% else %}Marina Phone{% endif %}
+            </label>
+            <input type="text" class="form-control" id="contact_phone"
+                   name="{{ 'fbo_phone' if vehicle_type == 'plane' else 'marina_phone' }}"
+                   value="{{ settings.get('fbo_phone' if vehicle_type == 'plane' else 'marina_phone', '') }}"
+                   placeholder="e.g. 830-555-1234">
+            <div class="form-text">Shown on the checkout checklist as an emergency contact</div>
+          </div>
+
+        </div>
+      </div>
+
+      {# ---- Weather ---- #}
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent fw-semibold">
+          <i class="bi bi-cloud-lightning me-2 text-club-blue"></i>Weather
+        </div>
+        <div class="card-body p-4">
+
+          {% if vehicle_type == 'boat' %}
+          <div class="mb-3">
+            <label class="form-label" for="weather_zone">NWS Weather Zone</label>
+            <input type="text" class="form-control" name="weather_zone" id="weather_zone"
+                   value="{{ settings.get('weather_zone', 'TXZ206') }}"
+                   placeholder="e.g. TXZ206">
+            <div class="form-text">NWS zone code for marine weather alerts</div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label" for="nws_county">NWS County Code</label>
+            <input type="text" class="form-control" name="nws_county" id="nws_county"
+                   value="{{ settings.get('nws_county', 'TXC091') }}"
+                   placeholder="e.g. TXC091">
+            <div class="form-text">NWS county code for flood/flood-watch alerts</div>
+          </div>
+          {% else %}
+          <div class="mb-0">
+            <label class="form-label" for="aviation_station">Aviation Weather Station (ICAO)</label>
+            <input type="text" class="form-control" name="aviation_station" id="aviation_station"
+                   value="{{ settings.get('aviation_station', 'KSAT') }}"
+                   placeholder="e.g. KSAT">
+            <div class="form-text">ICAO identifier for METAR weather data</div>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mb-4">
+        <button type="submit" class="btn btn-club-blue">
+          <i class="bi bi-check2-circle me-1"></i>Save Settings
+        </button>
+        <a href="{{ url_for('calendar') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}

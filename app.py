@@ -957,8 +957,9 @@ def register_routes(app: Flask):
     def admin_trip_logs():
         logs = models.get_all_trip_logs()
         vtype = getattr(g, "vehicle_type", "boat")
-        return render_template("admin/trip_logs.html", logs=logs,
-                               HOURS_LABEL=vehicle_types.get_hours_label(vtype))
+        settings = models.get_all_club_settings()
+        hours_lbl = settings.get("hours_label") or vehicle_types.get_hours_label(vtype)
+        return render_template("admin/trip_logs.html", logs=logs, HOURS_LABEL=hours_lbl)
 
     @app.route("/admin/feedback")
     @auth.admin_required
@@ -1061,6 +1062,30 @@ def register_routes(app: Flask):
 
         stmts = models.get_all_statements()
         return render_template("admin/statements.html", statements=stmts)
+
+    @app.route("/admin/settings", methods=["GET", "POST"])
+    @auth.admin_required
+    def admin_settings():
+        vtype = getattr(g, "vehicle_type", "boat")
+        if request.method == "POST":
+            # Boolean toggles — absent from form data means False
+            bool_keys = ["has_hours_meter", "has_fuel_level_enum", "fuel_required_on_return",
+                         "approval_required"]
+            for key in bool_keys:
+                models.update_club_setting(key, "true" if request.form.get(key) else "false")
+            # Text fields — save as-is (empty string clears the override)
+            for key in ["hours_label", "marina_phone", "fbo_phone",
+                        "weather_zone", "nws_county", "aviation_station"]:
+                val = request.form.get(key, "").strip()
+                models.update_club_setting(key, val)
+            user = auth.current_user()
+            models.log_action(user["id"], "settings_updated", "club_settings", None)
+            flash("Settings saved.", "success")
+            return redirect(url_for("admin_settings"))
+        settings = models.get_all_club_settings()
+        return render_template("admin/settings.html", settings=settings,
+                               vehicle_type=vtype,
+                               default_hours_label=vehicle_types.get_hours_label(vtype))
 
     # -- Password reset / welcome set-password --------------------------------
 

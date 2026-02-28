@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Check In — Bentley Boat Club{% endblock %}
+{% block title %}Check In — {{ club.name if club else 'ClubReserve' }}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -36,14 +36,17 @@
               {% else %}—{% endif %}
             </div>
           </div>
+          {% if show_hours_meter %}
           <div class="col-6">
-            <div class="text-muted small">Engine Hours Out</div>
+            <div class="text-muted small">{{ HOURS_LABEL }} Out</div>
             <div class="fw-semibold">
-              {% if trip_log.motor_hours_out is not none %}
-                {{ "%.1f"|format(trip_log.motor_hours_out) }}
+              {% if trip_log.primary_hours_out is not none %}
+                {{ "%.1f"|format(trip_log.primary_hours_out) }}
               {% else %}—{% endif %}
             </div>
           </div>
+          {% endif %}
+          {% if show_fuel_level %}
           <div class="col-6">
             <div class="text-muted small">Fuel Level</div>
             <div>
@@ -55,6 +58,7 @@
               {% else %}—{% endif %}
             </div>
           </div>
+          {% endif %}
           <div class="col-12">
             <div class="text-muted small">Condition Notes</div>
             <div class="small">{{ trip_log.condition_out or '—' }}</div>
@@ -81,21 +85,26 @@
                    value="{{ now_time }}" required>
           </div>
 
+          {% if show_hours_meter %}
           <div class="mb-3">
-            <label class="form-label">Engine Hours (in) <small class="text-muted">(optional)</small></label>
-            <input type="number" class="form-control" name="motor_hours_in"
+            <label class="form-label">{{ HOURS_LABEL }} (in) <small class="text-muted">(optional)</small></label>
+            <input type="number" class="form-control" name="primary_hours_in"
                    id="hoursIn" min="0" step="0.1"
                    placeholder="e.g. 127.2">
-            {% if trip_log.motor_hours_out is not none %}
+            {% if trip_log.primary_hours_out is not none %}
             <div class="form-text" id="hoursUsed"></div>
             {% endif %}
           </div>
+          {% endif %}
 
           <div class="row g-3 mb-3">
             <div class="col-6">
-              <label class="form-label">Fuel Added <small class="text-muted">(gal)</small></label>
+              <label class="form-label">Fuel Added <small class="text-muted">(gal)</small>
+                {% if fuel_required_on_return %}<span class="text-danger">*</span>{% endif %}
+              </label>
               <input type="number" class="form-control" name="fuel_added_gallons"
-                     id="gallons" min="0" step="0.01" placeholder="0.00">
+                     id="gallons" min="0" step="0.01" placeholder="0.00"
+                     {% if fuel_required_on_return %}required{% endif %}>
             </div>
             <div class="col-6">
               <label class="form-label">Total Cost <small class="text-muted">(auto-calc)</small></label>
@@ -130,8 +139,8 @@
 
 {% block scripts %}
 <script>
-{% if trip_log.motor_hours_out is not none %}
-const hoursOut = {{ trip_log.motor_hours_out }};
+{% if show_hours_meter and trip_log.primary_hours_out is not none %}
+const hoursOut = {{ trip_log.primary_hours_out }};
 const hoursIn  = document.getElementById('hoursIn');
 const hoursUsed = document.getElementById('hoursUsed');
 
@@ -147,6 +156,6 @@ hoursIn.addEventListener('input', function () {
     hoursUsed.textContent = '';
   }
 });
-{% endif %}
+{% endif %}{# show_hours_meter #}
 </script>
 {% endblock %}

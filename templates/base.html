@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Bentley Boat Club{% endblock %}</title>
+  <title>{% block title %}{{ club.name if club else 'ClubReserve' }}{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap">
@@ -22,9 +22,9 @@
   <div class="container-fluid">
     <a class="navbar-brand" href="{{ url_for('calendar') }}">
       <img src="{{ url_for('static', filename='images/badge.svg') }}"
-           class="brand-badge" alt="Bentley Boat Club"
+           class="brand-badge" alt="{{ club.name if club else 'ClubReserve' }}"
            width="34" height="34" style="height:34px;width:34px;flex-shrink:0">
-      Bentley Boat Club
+      {{ club.name if club else 'ClubReserve' }}
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
       <span class="navbar-toggler-icon"></span>
@@ -37,7 +37,10 @@
         </li>
         <li class="nav-item">
           <a class="nav-link {% if request.endpoint == 'my_reservations' %}active{% endif %}"
-             href="{{ url_for('my_reservations') }}"><i class="bi bi-bookmark-star me-1"></i>My Trips</a>
+             href="{{ url_for('my_reservations') }}">
+            <i class="bi bi-bookmark-star me-1"></i>
+            {% if is_plane %}My Flights{% else %}My Trips{% endif %}
+          </a>
         </li>
         <li class="nav-item">
           <a class="nav-link {% if request.endpoint == 'stats' %}active{% endif %}"
@@ -75,6 +78,7 @@
           </a>
           <ul class="dropdown-menu">
             <li><a class="dropdown-item" href="{{ url_for('admin_users') }}"><i class="bi bi-people me-1"></i>Members</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('admin_settings') }}"><i class="bi bi-gear me-1"></i>Settings</a></li>
             <li><a class="dropdown-item" href="{{ url_for('admin_blackouts') }}"><i class="bi bi-calendar-x me-1"></i>Blackout Dates</a></li>
             <li><a class="dropdown-item" href="{{ url_for('admin_approvals') }}"><i class="bi bi-hourglass-split me-1"></i>Approvals</a></li>
             <li><hr class="dropdown-divider"></li>
@@ -94,6 +98,14 @@
         {% endif %}
       </ul>
       <ul class="navbar-nav">
+        {% if current_sadmin %}
+        <li class="nav-item">
+          <a class="nav-link text-warning" href="{{ url_for('superadmin_dashboard') }}"
+             title="Super Admin Panel">
+            <i class="bi bi-shield-shaded me-1"></i><span class="badge bg-warning text-dark">SA</span>
+          </a>
+        </li>
+        {% endif %}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
             <i class="bi bi-person-circle me-1"></i>{{ current_user.full_name }}
