@@ -37,6 +37,9 @@
               <div>
                 <div class="res-avatar-sm d-inline-flex me-2">{{ res.full_name[0] }}</div>
                 <strong>{{ res.full_name }}</strong>
+                {% if res.vehicle_name %}
+                <span class="badge bg-secondary ms-1" style="font-size:0.7rem">{{ res.vehicle_name }}</span>
+                {% endif %}
                 <span class="text-muted ms-2">
                   {{ res.start_time.strftime('%-I:%M %p') }} – {{ res.end_time.strftime('%-I:%M %p') }} CT
                 </span>
@@ -138,6 +141,53 @@
         </p>
 
         <form method="post" id="reserveForm">
+
+          {# ---- Vehicle selection ---- #}
+          {% if vehicles|length == 1 %}
+          {# Single vehicle — auto-select silently #}
+          <input type="hidden" name="vehicle_id" value="{{ vehicles[0].id }}">
+          <p class="text-muted small mb-3">
+            <i class="bi bi-{% if is_plane %}airplane{% else %}tsunami{% endif %} me-1"></i>
+            <strong>{{ vehicles[0].name }}</strong>
+            {% if vehicles[0].tail_number %} · {{ vehicles[0].tail_number }}{% elif vehicles[0].registration_number %} · {{ vehicles[0].registration_number }}{% endif %}
+          </p>
+          {% else %}
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              Select {% if is_plane %}Aircraft{% else %}Vessel{% endif %}
+              <span class="text-muted fw-normal">(choose one or more)</span>
+            </label>
+            <div class="vehicle-select-grid" id="vehicleCheckboxes">
+              {% for v in vehicles %}
+              {% set booked_now = existing | selectattr("vehicle_id", "equalto", v.id) | list %}
+              <label class="vehicle-select-card {% if booked_now %}vehicle-select-card--busy{% endif %}"
+                     for="v{{ v.id }}">
+                <input class="vehicle-checkbox" type="checkbox" name="vehicle_id"
+                       id="v{{ v.id }}" value="{{ v.id }}"
+                       {% if booked_now %}data-busy="1"{% endif %}>
+                <span class="vehicle-select-info">
+                  <span class="vehicle-select-name">{{ v.name }}</span>
+                  {% if v.tail_number %}
+                  <span class="vehicle-select-reg">{{ v.tail_number }}</span>
+                  {% elif v.registration_number %}
+                  <span class="vehicle-select-reg">{{ v.registration_number }}</span>
+                  {% endif %}
+                  {% if booked_now %}
+                  <span class="vehicle-select-busy-badge">
+                    <i class="bi bi-clock me-1"></i>Has reservations today
+                  </span>
+                  {% else %}
+                  <span class="vehicle-select-avail-badge">
+                    <i class="bi bi-check-circle me-1"></i>Available
+                  </span>
+                  {% endif %}
+                </span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
           <div class="row g-3">
             <div class="col-6">
               <label class="form-label" for="start_time">Start Time</label>
@@ -178,8 +228,8 @@
             </div>
           </div>
 
-          <button type="submit" class="btn btn-club-blue mt-3 w-100" id="submitBtn">
-            <i class="bi bi-check-lg me-1"></i>Reserve
+          <button type="submit" class="btn btn-club-blue mt-3 w-100" id="submitBtn" disabled>
+            <i class="bi bi-check-lg me-1"></i><span id="submitLabel">Reserve</span>
           </button>
         </form>
       </div>
@@ -193,17 +243,19 @@
 {% block scripts %}
 <script>
 (function () {
-  const startEl = document.getElementById('start_time');
-  const endEl   = document.getElementById('end_time');
-  const hint    = document.getElementById('durationHint');
-  const btn     = document.getElementById('submitBtn');
-  const notesEl = document.getElementById('notes');
-  const countEl = document.getElementById('notesCount');
+  const startEl    = document.getElementById('start_time');
+  const endEl      = document.getElementById('end_time');
+  const hint       = document.getElementById('durationHint');
+  const btn        = document.getElementById('submitBtn');
+  const submitLbl  = document.getElementById('submitLabel');
+  const notesEl    = document.getElementById('notes');
+  const countEl    = document.getElementById('notesCount');
+  const checkboxes = Array.from(document.querySelectorAll('.vehicle-checkbox'));
+  // If there's a hidden single-vehicle input instead of checkboxes, treat as always-selected
+  const singleMode = checkboxes.length === 0;
 
   if (notesEl && countEl) {
-    notesEl.addEventListener('input', function () {
-      countEl.textContent = notesEl.value.length;
-    });
+    notesEl.addEventListener('input', () => { countEl.textContent = notesEl.value.length; });
   }
 
   if (!startEl) return;
@@ -226,40 +278,71 @@
     return o;
   }
 
+  function selectedVehicles() {
+    return singleMode ? ['1'] : checkboxes.filter(c => c.checked);
+  }
+
+  function updateSubmit() {
+    const hasVehicle = singleMode || checkboxes.some(c => c.checked);
+    const hasTime    = startEl.value && endEl.value;
+    btn.disabled = !(hasVehicle && hasTime);
+
+    if (!hasTime) return;
+    const [sh, sm] = startEl.value.split(':').map(Number);
+    const [eh, em] = endEl.value.split(':').map(Number);
+    const hrs = ((eh * 60 + em) - (sh * 60 + sm)) / 60;
+    hint.className = 'form-text text-success';
+    hint.textContent = (hrs % 1 === 0 ? hrs : hrs.toFixed(1)) + ' hours';
+
+    if (!singleMode) {
+      const checked = checkboxes.filter(c => c.checked);
+      if (checked.length > 1) {
+        const names = checked.map(c => c.closest('label').querySelector('.vehicle-select-name').textContent.trim());
+        submitLbl.textContent = `Reserve ${names.join(' & ')}`;
+      } else if (checked.length === 1) {
+        const name = checked[0].closest('label').querySelector('.vehicle-select-name').textContent.trim();
+        submitLbl.textContent = `Reserve ${name}`;
+      } else {
+        submitLbl.textContent = 'Reserve';
+      }
+    }
+  }
+
   function populateEndTimes() {
     while (endEl.firstChild) endEl.removeChild(endEl.firstChild);
     endEl.disabled = true;
     hint.textContent = '';
-    btn.disabled = true;
 
     if (!startEl.value) {
       endEl.appendChild(makeOpt('', '— pick start first —'));
+      updateSubmit();
       return;
     }
 
     const [sh, sm] = startEl.value.split(':').map(Number);
     const startMins = sh * 60 + sm;
-
     endEl.appendChild(makeOpt('', '— select —'));
     for (let t = startMins + 120; t <= startMins + 360 && t <= 1440; t += 30) {
       const f = fmt12(t);
       endEl.appendChild(makeOpt(f.value, f.label));
     }
     endEl.disabled = false;
+    updateSubmit();
   }
 
-  function update() {
-    if (!startEl.value || !endEl.value) { hint.textContent = ''; btn.disabled = true; return; }
-    const [sh, sm] = startEl.value.split(':').map(Number);
-    const [eh, em] = endEl.value.split(':').map(Number);
-    const hrs = ((eh * 60 + em) - (sh * 60 + sm)) / 60;
-    hint.className = 'form-text text-success';
-    hint.textContent = (hrs % 1 === 0 ? hrs : hrs.toFixed(1)) + ' hours — looks good!';
-    btn.disabled = false;
-  }
+  // Highlight selected vehicle cards
+  checkboxes.forEach(cb => {
+    cb.addEventListener('change', function () {
+      this.closest('label').classList.toggle('vehicle-select-card--selected', this.checked);
+      updateSubmit();
+    });
+  });
 
-  startEl.addEventListener('change', function () { populateEndTimes(); });
-  endEl.addEventListener('change', update);
+  // If single-mode, enable button as soon as times are set
+  if (singleMode) btn.disabled = true;
+
+  startEl.addEventListener('change', populateEndTimes);
+  endEl.addEventListener('change', updateSubmit);
 })();
 </script>
 

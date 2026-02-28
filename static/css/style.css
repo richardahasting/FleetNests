@@ -342,6 +342,86 @@ thead.table-light th {
   padding: 0.5rem 0.75rem;
 }
 
+/* ── Vehicle selection cards (multi-vehicle reservation) ── */
+.vehicle-select-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+.vehicle-select-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  border: 2px solid #dee2e6;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  background: #fff;
+  user-select: none;
+}
+.vehicle-select-card:hover {
+  border-color: var(--club-primary, #0A2342);
+  box-shadow: 0 0 0 3px rgba(10,35,66,0.08);
+}
+.vehicle-select-card--selected {
+  border-color: var(--club-primary, #0A2342);
+  background: rgba(10,35,66,0.04);
+}
+.vehicle-select-card--busy {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: #f8f9fa;
+}
+.vehicle-select-card--busy:hover {
+  border-color: #dee2e6;
+  box-shadow: none;
+}
+.vehicle-checkbox {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+  accent-color: var(--club-primary, #0A2342);
+  width: 1.1em;
+  height: 1.1em;
+}
+.vehicle-select-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.vehicle-select-name {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--club-primary, #0A2342);
+  line-height: 1.2;
+}
+.vehicle-select-reg {
+  font-size: 0.78rem;
+  color: #6c757d;
+  font-family: monospace;
+}
+.vehicle-select-busy-badge {
+  display: inline-block;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #dc3545;
+  background: #fde8ea;
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+}
+.vehicle-select-avail-badge {
+  display: inline-block;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #198754;
+  background: #d1e7dd;
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+}
+
 /* ── Vehicle photo card ── */
 .vehicle-photo-card {
   border-radius: 0.75rem;

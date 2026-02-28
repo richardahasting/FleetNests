@@ -190,7 +190,7 @@ def register_routes(app: Flask):
             start_ct = row["start_time"].replace(tzinfo=CENTRAL) if row["start_time"] else None
             end_ct   = row["end_time"].replace(tzinfo=CENTRAL)   if row["end_time"]   else None
             events.append({
-                "title": row["full_name"],
+                "title": (row["vehicle_name"] + " — " if row.get("vehicle_name") else "") + row["full_name"],
                 "start": start_ct.isoformat() if start_ct else row["date"].isoformat(),
                 "end":   end_ct.isoformat()   if end_ct   else None,
                 "color": color,
@@ -222,69 +222,106 @@ def register_routes(app: Flask):
         except ValueError:
             abort(404)
 
-        user = auth.current_user()
-        eff_id = models.get_effective_user_id(user)
-        vehicle_id = models.get_default_vehicle_id()
-        vtype = getattr(g, "vehicle_type", "boat")
+        user    = auth.current_user()
+        eff_id  = models.get_effective_user_id(user)
+        vtype   = getattr(g, "vehicle_type", "boat")
         settings = models.get_all_club_settings()
+        vehicles = models.get_all_vehicles()   # all active vehicles for selection
         existing = models.get_reservations_for_date(day)
 
+        def _render(extra=None):
+            user_res_ids = {r["user_id"] for r in existing}
+            # A day is only "fully booked" when every vehicle has no 2-hr gap remaining
+            fully_booked = all(
+                models.is_day_fully_booked([r for r in existing if r.get("vehicle_id") == v["id"]])
+                for v in vehicles
+            ) if vehicles else False
+            kw = dict(
+                day=day, existing=existing, today=date.today(),
+                vehicles=vehicles,
+                user_has_res=eff_id in user_res_ids,
+                on_waitlist=models.is_on_waitlist(eff_id, day),
+                day_is_fully_booked=fully_booked,
+                vehicle_photo=models.get_primary_vehicle_photo(),
+            )
+            if extra:
+                kw.update(extra)
+            return render_template("reserve.html", **kw)
+
         if request.method == "POST":
-            start_str = request.form.get("start_time", "").strip()
-            end_str   = request.form.get("end_time", "").strip()
-            notes     = request.form.get("notes", "").strip()[:300]
+            start_str   = request.form.get("start_time", "").strip()
+            end_str     = request.form.get("end_time",   "").strip()
+            notes       = request.form.get("notes", "").strip()[:300]
+            selected_ids = request.form.getlist("vehicle_id")
+
+            # Validate inputs
+            if not selected_ids:
+                flash("Please select at least one vehicle.", "danger")
+                return _render()
+            try:
+                vehicle_ids = [int(v) for v in selected_ids]
+            except ValueError:
+                flash("Invalid vehicle selection.", "danger")
+                return _render()
+            # Ensure all selected vehicle IDs belong to this club's active fleet
+            valid_ids = {v["id"] for v in vehicles}
+            if not all(vid in valid_ids for vid in vehicle_ids):
+                flash("Invalid vehicle selection.", "danger")
+                return _render()
+
             try:
                 start_dt = datetime.fromisoformat(f"{res_date}T{start_str}")
                 end_dt   = datetime.fromisoformat(f"{res_date}T{end_str}")
             except ValueError:
                 flash("Invalid time format.", "danger")
-                user_res_ids = {r["user_id"] for r in existing}
-                on_waitlist  = models.is_on_waitlist(eff_id, day)
-                return render_template("reserve.html", day=day, existing=existing, today=date.today(),
-                                       user_has_res=eff_id in user_res_ids,
-                                       on_waitlist=on_waitlist)
+                return _render()
 
             vnoun = vehicle_types.get_vehicle_noun(vtype)
-            error = models.validate_reservation(eff_id, start_dt, end_dt,
-                                                vehicle_id=vehicle_id, vehicle_noun=vnoun)
-            if error:
-                flash(error, "danger")
-            else:
-                approval_setting = settings.get("approval_required", "false").lower() == "true"
-                status_after = "pending_approval" if approval_setting else "active"
-                result = models.make_reservation(eff_id, start_dt, end_dt, notes=notes,
-                                                 status=status_after, vehicle_id=vehicle_id)
-                if result is None:
-                    # Overlap detected under lock (concurrent submission race condition)
-                    flash("That time slot was just booked by another member. Please choose a different time.", "danger")
-                    existing = models.get_reservations_for_date(day)
-                    return render_template("reserve.html", day=day, existing=existing, today=date.today(),
-                                           user_has_res=eff_id in {r["user_id"] for r in existing},
-                                           on_waitlist=models.is_on_waitlist(eff_id, day),
-                                           day_is_fully_booked=models.is_day_fully_booked(existing))
+            # Validate each selected vehicle independently
+            errors = []
+            for vid in vehicle_ids:
+                err = models.validate_reservation(eff_id, start_dt, end_dt,
+                                                  vehicle_id=vid, vehicle_noun=vnoun)
+                if err:
+                    vname = next((v["name"] for v in vehicles if v["id"] == vid), f"Vehicle {vid}")
+                    errors.append(f"{vname}: {err}")
+            if errors:
+                for e in errors:
+                    flash(e, "danger")
+                return _render()
+
+            approval_setting = settings.get("approval_required", "false").lower() == "true"
+            status_after     = "pending_approval" if approval_setting else "active"
+
+            results = models.make_reservation_multi(eff_id, vehicle_ids, start_dt, end_dt,
+                                                    notes=notes, status=status_after)
+            if results is None:
+                flash("A time slot conflict was detected. Please choose a different time or vehicle.", "danger")
+                existing = models.get_reservations_for_date(day)
+                return _render()
+
+            for result in results:
                 models.log_action(user["id"], "reservation_created", "reservation",
                                   result["id"],
-                                  {"date": res_date, "start": start_str, "end": end_str})
-                if approval_setting:
-                    flash(f"Reservation request submitted for {day.strftime('%B %d')} — awaiting admin approval.", "info")
-                    admins = [u for u in models.get_all_active_users() if u["is_admin"]]
-                    email_notify.notify_approval_needed(admins, user,
-                        {"date": day, "start_time": start_dt, "end_time": end_dt})
-                else:
-                    flash(f"Reserved {day.strftime('%B %d')} "
-                          f"{start_dt.strftime('%-I:%M %p')}–{end_dt.strftime('%-I:%M %p')} CT!", "success")
-                    email_notify.notify_reservation_confirmed(user,
-                        {"date": day, "start_time": start_dt, "end_time": end_dt})
-                return redirect(url_for("calendar"))
+                                  {"date": res_date, "start": start_str, "end": end_str,
+                                   "vehicle_count": len(vehicle_ids)})
 
-        user_res_ids = {r["user_id"] for r in existing}
-        on_waitlist  = models.is_on_waitlist(eff_id, day)
-        vehicle_photo = models.get_primary_vehicle_photo()
-        return render_template("reserve.html", day=day, existing=existing, today=date.today(),
-                               user_has_res=eff_id in user_res_ids,
-                               on_waitlist=on_waitlist,
-                               day_is_fully_booked=models.is_day_fully_booked(existing),
-                               vehicle_photo=vehicle_photo)
+            vehicle_names = [v["name"] for v in vehicles if v["id"] in vehicle_ids]
+            vlist = " & ".join(vehicle_names)
+            if approval_setting:
+                flash(f"Reservation request submitted for {day.strftime('%B %d')} ({vlist}) — awaiting admin approval.", "info")
+                admins = [u for u in models.get_all_active_users() if u["is_admin"]]
+                email_notify.notify_approval_needed(admins, user,
+                    {"date": day, "start_time": start_dt, "end_time": end_dt})
+            else:
+                flash(f"Reserved {day.strftime('%B %d')} "
+                      f"{start_dt.strftime('%-I:%M %p')}–{end_dt.strftime('%-I:%M %p')} CT"
+                      f" — {vlist}!", "success")
+                email_notify.notify_reservation_confirmed(user,
+                    {"date": day, "start_time": start_dt, "end_time": end_dt})
+            return redirect(url_for("calendar"))
+
+        return _render()
 
     @app.route("/cancel/<int:res_id>", methods=["POST"])
     @auth.login_required

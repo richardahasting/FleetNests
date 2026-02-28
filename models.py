@@ -163,9 +163,11 @@ def get_reservations_range(start: date, end: date) -> list:
     """Return all active reservations between start and end dates (inclusive)."""
     return db.execute(
         "SELECT r.id, r.date, r.start_time, r.end_time, r.status, r.user_id, "
-        "COALESCE(u.display_name, u.full_name) AS full_name "
+        "COALESCE(u.display_name, u.full_name) AS full_name, "
+        "v.name AS vehicle_name "
         "FROM reservations r "
         "JOIN users u ON u.id = r.user_id "
+        "LEFT JOIN vehicles v ON v.id = r.vehicle_id "
         "WHERE r.date BETWEEN %s AND %s AND r.status IN ('active','pending_approval') "
         "ORDER BY r.start_time",
         (start, end),
@@ -175,9 +177,11 @@ def get_reservations_range(start: date, end: date) -> list:
 def get_reservations_for_date(res_date: date) -> list:
     """Return all active/pending reservations for a specific day, ordered by start time."""
     return db.execute(
-        "SELECT r.id, r.start_time, r.end_time, r.user_id, r.status, r.notes, u.full_name, u.username "
+        "SELECT r.id, r.start_time, r.end_time, r.user_id, r.status, r.notes, "
+        "u.full_name, u.username, r.vehicle_id, v.name AS vehicle_name "
         "FROM reservations r "
         "JOIN users u ON u.id = r.user_id "
+        "LEFT JOIN vehicles v ON v.id = r.vehicle_id "
         "WHERE r.date = %s AND r.status IN ('active', 'pending_approval') "
         "ORDER BY r.start_time",
         (res_date,),
@@ -396,6 +400,40 @@ def make_reservation(user_id: int, start_dt: datetime, end_dt: datetime,
                 (user_id, vehicle_id, start_dt.date(), start_dt, end_dt, notes, status),
             )
             return cur.fetchone()
+
+
+def make_reservation_multi(user_id: int, vehicle_ids: list, start_dt: datetime,
+                           end_dt: datetime, notes: str | None = None,
+                           status: str = 'active') -> list | None:
+    """
+    Atomically create one reservation per vehicle in vehicle_ids.
+    Returns a list of created reservation row dicts, or None if any vehicle
+    has a conflicting reservation (all-or-nothing — nothing is inserted on conflict).
+    """
+    notes = (notes or "").strip() or None
+    with db.get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("LOCK TABLE reservations IN SHARE ROW EXCLUSIVE MODE")
+            # Re-check each vehicle for overlap under the lock
+            for vid in vehicle_ids:
+                cur.execute(
+                    "SELECT id FROM reservations "
+                    "WHERE vehicle_id = %s AND status IN ('active','pending_approval') "
+                    "AND start_time < %s AND end_time > %s",
+                    (vid, end_dt, start_dt),
+                )
+                if cur.fetchone():
+                    return None  # conflict on this vehicle — abort all
+            results = []
+            for vid in vehicle_ids:
+                cur.execute(
+                    "INSERT INTO reservations "
+                    "(user_id, vehicle_id, date, start_time, end_time, notes, status) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                    (user_id, vid, start_dt.date(), start_dt, end_dt, notes, status),
+                )
+                results.append(cur.fetchone())
+            return results
 
 
 def cancel_reservation(res_id: int, user_id: int, is_admin: bool = False) -> bool:
