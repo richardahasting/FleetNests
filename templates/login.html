@@ -2,28 +2,7 @@
 {% block title %}Login — {{ club.name if club else 'FleetNests' }}{% endblock %}
 
 {% block content %}
-{% if club and club.short_name in ('sample1', 'sample2') %}
-{% set demo_user = 'jwilson' if club.short_name == 'sample1' else 'rbennett' %}
-<div class="row justify-content-center mt-4 mb-0">
-  <div class="col-12 col-sm-10 col-md-7 col-lg-5">
-    <div class="alert alert-info border-0 shadow-sm px-4 py-3 demo-login-hint">
-      <div class="d-flex align-items-start gap-2">
-        <i class="bi bi-info-circle-fill fs-5 mt-1 flex-shrink-0"></i>
-        <div>
-          <strong>This is a live demo.</strong>
-          Use the credentials below to explore {{ club.name }} as a club administrator.
-          All data resets nightly — feel free to try anything!
-          <div class="mt-2 p-2 rounded demo-creds">
-            <span class="me-3"><i class="bi bi-person me-1"></i>Username: <code>{{ demo_user }}</code></span>
-            <span><i class="bi bi-key me-1"></i>Password: <code>FleetNests2026!</code></span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-{% endif %}
-<div class="row justify-content-center mt-3">
+<div class="row justify-content-center mt-5">
   <div class="col-12 col-sm-8 col-md-5 col-lg-4">
     <div class="card shadow-sm login-card">
       <div class="card-body p-4">
@@ -32,10 +11,35 @@
                class="login-brand-badge mb-3" alt="{{ club.name if club else 'FleetNests' }}"
                width="80" height="80" style="height:80px;width:80px">
           <h4 class="fw-bold mb-1" style="color:var(--navy)">{{ club.name if club else 'FleetNests' }}</h4>
+          {% if is_demo %}
+          <p class="text-muted small mb-0">Live Demo — Explore the full platform</p>
+          {% else %}
           <p class="text-muted small mb-0">Member Reservation System</p>
+          {% endif %}
         </div>
         <hr class="divider-gold">
 
+        {% if is_demo %}
+        {# ── Demo email-capture form ── #}
+        <p class="text-center text-muted small mb-3">
+          Enter your email to get instant access&mdash;no password needed.
+        </p>
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label" for="email">Your Email Address</label>
+            <input type="email" class="form-control form-control-lg" id="email" name="email"
+                   placeholder="you@example.com" autocomplete="email" autofocus required>
+          </div>
+          <button type="submit" class="btn btn-club-blue w-100 btn-lg">
+            <i class="bi bi-arrow-right-circle me-1"></i>Explore the Demo
+          </button>
+        </form>
+        <p class="text-center text-muted" style="font-size:0.75rem;margin-top:1rem">
+          You'll be logged in as a club administrator. Data resets nightly.
+        </p>
+
+        {% else %}
+        {# ── Standard member login ── #}
         <form method="post">
           <div class="mb-3">
             <label class="form-label" for="username">Username or Email</label>
@@ -58,6 +62,8 @@
         <p class="text-center small mt-2 mb-0">
           <a href="{{ url_for('forgot_password') }}" class="text-muted">Forgot your password?</a>
         </p>
+        {% endif %}
+
       </div>
     </div>
   </div>

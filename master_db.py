@@ -164,3 +164,36 @@ def log_master_action(admin_id: int | None, action: str,
         )
     except Exception:
         pass
+
+
+# ---------------------------------------------------------------------------
+# Demo leads (sample site email capture)
+# ---------------------------------------------------------------------------
+
+def save_demo_lead(email: str, club_short_name: str, club_name: str,
+                   ip_address: str = None, user_agent: str = None) -> bool:
+    """Save a prospect email from a sample site. Returns True on success."""
+    try:
+        _insert(
+            "INSERT INTO demo_leads (email, club_short_name, club_name, ip_address, user_agent) "
+            "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (email.lower().strip(), club_short_name, club_name, ip_address, user_agent),
+        )
+        return True
+    except Exception:
+        return False
+
+
+def get_demo_leads(club_short_name: str = None) -> list:
+    """Return all demo leads, optionally filtered by club."""
+    import psycopg2.extras
+    with get_master_db() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        if club_short_name:
+            cur.execute(
+                "SELECT * FROM demo_leads WHERE club_short_name=%s ORDER BY created_at DESC",
+                (club_short_name,),
+            )
+        else:
+            cur.execute("SELECT * FROM demo_leads ORDER BY created_at DESC")
+        return [dict(r) for r in cur.fetchall()]

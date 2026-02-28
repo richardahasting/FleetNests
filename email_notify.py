@@ -254,3 +254,31 @@ def notify_waitlist_available(user: dict, desired_date) -> bool:
         f"{ctx['app_url']}/reserve/{desired_date}\n\n"
         f"{ctx['signature']}",
     )
+
+
+def notify_demo_lead(prospect_email: str, club_name: str, club_short_name: str,
+                     ip_address: str = None) -> bool:
+    """Notify richard@hastingtx.org that a prospect accessed a sample site."""
+    if not EMAIL_ENABLED:
+        return False
+    notify_addr = os.environ.get("DEMO_NOTIFY_EMAIL", "richard@hastingtx.org")
+    subject = f"[FleetNests] New prospect: {prospect_email} viewed {club_name}"
+    body = (
+        f"A prospect just accessed the {club_name} demo site on FleetNests.\n\n"
+        f"  Email:   {prospect_email}\n"
+        f"  Club:    {club_name} ({club_short_name})\n"
+        f"  Site:    https://fleetnests.com/{club_short_name}/\n"
+    )
+    if ip_address:
+        body += f"  IP:      {ip_address}\n"
+    body += "\nAll demo leads are stored in the fleetnests_master.demo_leads table.\n"
+    try:
+        msg = MIMEText(body, "plain")
+        msg["Subject"] = subject
+        msg["From"]    = os.environ.get("EMAIL_FROM", "admin@fleetnests.com")
+        msg["To"]      = notify_addr
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=5) as smtp:
+            smtp.sendmail(msg["From"], [notify_addr], msg.as_string())
+        return True
+    except Exception:
+        return False

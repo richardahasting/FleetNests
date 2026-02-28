@@ -22,6 +22,7 @@ import db
 import models
 import email_notify
 import club_resolver
+import master_db
 import vehicle_types
 
 CENTRAL = ZoneInfo("America/Chicago")
@@ -104,22 +105,48 @@ def register_routes(app: Flask):
 
     # -- Auth ------------------------------------------------------------
 
+    # Demo sample sites: email-only access (no password)
+    DEMO_CLUBS = {
+        "sample1": "jwilson",
+        "sample2": "rbennett",
+    }
+
     @app.route("/login", methods=["GET", "POST"])
     def login():
         if auth.current_user():
             return redirect(url_for("calendar"))
 
-        if request.method == "POST":
+        club = getattr(g, "club", None)
+        is_demo = club and club.get("short_name") in DEMO_CLUBS
+
+        if request.method == "POST" and is_demo:
+            # Demo clubs: capture email, log in as the demo admin automatically
+            email = request.form.get("email", "").strip().lower()
+            if not email or "@" not in email:
+                flash("Please enter a valid email address.", "danger")
+                return render_template("login.html", is_demo=True)
+
+            ip = request.headers.get("X-Real-IP") or request.remote_addr
+            ua = request.headers.get("User-Agent", "")[:500]
+            master_db.save_demo_lead(email, club["short_name"], club["name"], ip, ua)
+            email_notify.notify_demo_lead(email, club["name"], club["short_name"], ip)
+
+            demo_username = DEMO_CLUBS[club["short_name"]]
+            demo_user = db.fetchone("SELECT * FROM users WHERE username = %s", (demo_username,))
+            if demo_user:
+                auth.login_user(dict(demo_user), club_short_name=club["short_name"])
+                return redirect(url_for("calendar"))
+
+        if request.method == "POST" and not is_demo:
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "")
             user = auth.authenticate(username, password)
             if user:
-                club = getattr(g, "club", None)
                 auth.login_user(user, club_short_name=club["short_name"] if club else None)
                 return redirect(url_for("calendar"))
             flash("Invalid username or password.", "danger")
 
-        return render_template("login.html")
+        return render_template("login.html", is_demo=is_demo)
 
     @app.route("/logout")
     def logout():
