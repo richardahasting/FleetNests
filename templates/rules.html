@@ -14,86 +14,62 @@
     <div class="alert alert-warning border-warning mb-4" role="alert">
       <i class="bi bi-exclamation-triangle-fill me-2"></i>
       <strong>Safety is no accident.</strong> Every member is responsible for
-      knowing and following these rules on every trip.
+      knowing and following these rules on every {% if is_plane %}flight{% else %}trip{% endif %}.
     </div>
 
     <div class="card border-0 shadow-sm mb-4">
       <div class="card-body p-0">
         <ol class="list-group list-group-flush list-group-numbered rounded">
-          <li class="list-group-item px-4 py-3">
-            Generally, The Enclave residents &amp; CLA Pilots only.
-          </li>
-          <li class="list-group-item px-4 py-3">
-            <strong>Inspect the boat &amp; prop before and after each trip.</strong>
-          </li>
-          <li class="list-group-item px-4 py-3">
-            Fill with gas when finished or leave cash in the cash bottle.
-          </li>
-          <li class="list-group-item px-4 py-3">
-            Follow <strong>all</strong> of the Captain's Checklist every time.
-            <a href="{{ url_for('checklist_page') }}" class="ms-1 small">
-              <i class="bi bi-clipboard2-check me-1"></i>View Checklist
-            </a>
-          </li>
-          <li class="list-group-item px-4 py-3">
-            Every trip must have a designated Captain in charge who is
-            <strong>responsible and liable for everything and everyone during the voyage.</strong>
-          </li>
-          <li class="list-group-item px-4 py-3">
-            <strong>Motor must always be off when swimmers are in the water.</strong>
-          </li>
-          <li class="list-group-item px-4 py-3">
-            Initial fee is non-refundable unless you find a suitable replacement
-            member to take your place in the Club.
-          </li>
-          <li class="list-group-item px-4 py-3">
-            Monthly payments due on the 1st — pay by Zelle, Venmo, or PayPal to
-            <strong>Steve Cossette</strong>. Members share equally in all routine
-            maintenance &amp; repairs.
-          </li>
-          <li class="list-group-item px-4 py-3">
-            The Member is always responsible for the boat, fuel, and damages
-            during use by them or any family member.
-          </li>
-          <li class="list-group-item px-4 py-3">
-            Only Members may reserve and operate the boat. Non-members such as
-            family require training and approval.
-          </li>
-          <li class="list-group-item px-4 py-3">
-            Any boat issues or emergencies while on the lake:
-            <strong>Call Marina at <a href="tel:8302557442">830-255-7442</a></strong>.
-            Tell them you are a member — they will help or send someone out pronto.
-            Marina membership is in the name of Steve Cossette.
-          </li>
-          <li class="list-group-item px-4 py-3">
-            Steve Cossette has final say on any issues or disputes.
-          </li>
+          {% if member_rules %}
+            {% for rule in member_rules %}
+            <li class="list-group-item px-4 py-3">{{ rule | safe }}</li>
+            {% endfor %}
+          {% elif is_plane %}
+            {# Generic aviation fallback #}
+            <li class="list-group-item px-4 py-3">Club aircraft are for member use only. Non-members may fly only as passengers with a current member acting as Pilot-in-Command.</li>
+            <li class="list-group-item px-4 py-3"><strong>Complete the pre-flight checklist before every flight</strong> — no exceptions.</li>
+            <li class="list-group-item px-4 py-3">Log all Hobbs time accurately. Discrepancies must be reported to a club officer before leaving the airport.</li>
+            <li class="list-group-item px-4 py-3">Return the aircraft with at least minimum fuel reserves (30 min VFR / 45 min IFR). Top off whenever possible.</li>
+            <li class="list-group-item px-4 py-3">All squawks and maintenance items must be entered in the aircraft log before leaving the ramp.</li>
+            <li class="list-group-item px-4 py-3">Members must maintain current medical and flight review. Notify the club immediately if currency lapses.</li>
+            <li class="list-group-item px-4 py-3">The Pilot-in-Command is solely responsible for all persons aboard and for compliance with all applicable FARs.</li>
+            <li class="list-group-item px-4 py-3">Monthly dues are due on the 1st. Members more than 30 days past due may not reserve aircraft until current.</li>
+          {% else %}
+            {# Generic boating fallback #}
+            <li class="list-group-item px-4 py-3">Club vessels are for member use only.</li>
+            <li class="list-group-item px-4 py-3"><strong>Inspect the vessel before and after each trip.</strong></li>
+            <li class="list-group-item px-4 py-3">Return with a full fuel tank or leave reimbursement per club policy.</li>
+            <li class="list-group-item px-4 py-3">Follow the Captain's Checklist every time. <a href="{{ url_for('checklist_page') }}" class="ms-1 small"><i class="bi bi-clipboard2-check me-1"></i>View Checklist</a></li>
+            <li class="list-group-item px-4 py-3">Every trip must have a designated Captain who is <strong>responsible and liable</strong> for all persons aboard.</li>
+            <li class="list-group-item px-4 py-3"><strong>Motor must be off when swimmers are in the water.</strong></li>
+            <li class="list-group-item px-4 py-3">Monthly dues are due on the 1st. Members more than 30 days past due may not reserve vessels until current.</li>
+          {% endif %}
         </ol>
       </div>
     </div>
 
+    {# Checklist card — only shown if items are configured #}
+    {% if CHECKLIST_ITEMS %}
     <div class="card border-0 shadow-sm mb-4">
       <div class="card-header bg-transparent fw-semibold">
-        <i class="bi bi-clipboard2-check me-2 text-club-blue"></i>Captain's Checklist
+        <i class="bi bi-clipboard2-check me-2 text-club-blue"></i>{{ CHECKLIST_NAME }}
       </div>
       <div class="card-body p-0">
-        <div class="alert alert-warning rounded-0 mb-0 small">
-          <strong>NO SUCH THING AS DRIVING TOO SLOW AROUND THE MARINA &amp; SLIPS.</strong>
-          Use a passenger &amp; the push pole to assist around the boat slip,
-          especially when docking.
-        </div>
         <ol class="list-group list-group-flush list-group-numbered rounded-bottom">
-          {% for item in CAPTAIN_CHECKLIST %}
+          {% for item in CHECKLIST_ITEMS %}
           <li class="list-group-item px-4 py-3 small">{{ item }}</li>
           {% endfor %}
         </ol>
       </div>
+      {% if CONTACT_PHONE %}
       <div class="card-footer bg-transparent small text-muted">
         <i class="bi bi-telephone me-1"></i><strong>Emergency:</strong>
-        Call Marina at <a href="tel:8302557442">830-255-7442</a>
-        &nbsp;·&nbsp; Captain is in charge. Safety is no accident.
+        {{ CONTACT_PHONE_LABEL }}: <a href="tel:{{ CONTACT_PHONE|replace(' ','') }}">{{ CONTACT_PHONE }}</a>
+        &nbsp;·&nbsp; Safety is no accident.
       </div>
+      {% endif %}
     </div>
+    {% endif %}
 
     <div class="card border-0 shadow-sm mb-4 border-start border-4 border-warning">
       <div class="card-body small text-muted">

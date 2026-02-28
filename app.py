@@ -1028,9 +1028,18 @@ def register_routes(app: Flask):
     @app.route("/rules")
     @auth.login_required
     def rules_page():
+        import json as _json
         vtype = getattr(g, "vehicle_type", "boat")
         settings = models.get_all_club_settings()
         ctx = vehicle_types.build_checkout_context(vtype, settings)
+        raw = settings.get("member_rules_json")
+        member_rules = []
+        if raw:
+            try:
+                member_rules = _json.loads(raw)
+            except Exception:
+                pass
+        ctx["member_rules"] = member_rules
         return render_template("rules.html", **ctx)
 
     @app.route("/checklist")

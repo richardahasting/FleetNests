@@ -14,7 +14,7 @@ Sample 2 — Clearwater Boat Club (Lake Geneva, WI)
   • 14 members
 """
 
-import os, random, sys
+import os, random, sys, json
 from datetime import date, datetime, timedelta
 import psycopg2
 import psycopg2.extras
@@ -377,6 +377,100 @@ def seed_club(get_conn, members, vehicles, destinations, conditions,
     db.close()
 
 
+# ── club settings (rules, checklist, contact info) ───────────────────────────
+
+def upsert_setting(cur, key, value):
+    cur.execute("""
+        INSERT INTO club_settings (key, value, updated_at)
+        VALUES (%s, %s, NOW())
+        ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()
+    """, (key, value))
+
+RULES_S1 = [
+    "Membership in Summit Ridge Flying Club is open to certificated pilots in good standing. All members must maintain at least a Private Pilot certificate (ASEL) and a valid medical.",
+    "<strong>Complete the Pre-Flight Checklist before every flight</strong> — no exceptions, regardless of experience level or familiarity with the aircraft.",
+    "Log all Hobbs time accurately in the aircraft logbook and in FleetNests. Any discrepancy must be reported to a club officer before leaving the ramp.",
+    "Return with at least <strong>1 hour VFR fuel reserve / 45 min IFR fuel reserve</strong>. Top off at destination when practical. Both aircraft use 100LL only.",
+    "All squawks, write-ups, and maintenance concerns must be entered in the aircraft maintenance log before leaving the aircraft. If the aircraft is unairworthy, ground it and notify the Safety Officer immediately.",
+    "Members must be current per FAR 61.56 (BFR) and 61.57 (recency of experience). Notify the club immediately if any currency or certificate lapses — you may not fly club aircraft until restored.",
+    "High-altitude and mountain flying: Flagstaff sits at 7,014 ft MSL. All members must review density altitude procedures and complete the club's Mountain Flying endorsement before flying the M600 above FL250.",
+    "The Pilot-in-Command is solely responsible for the safe operation of the aircraft, all persons aboard, and compliance with all applicable FARs. Non-pilot passengers may accompany members after signing the club liability waiver.",
+    "Aircraft must be returned clean and ready for the next member. Wipe down surfaces after dusty or wet flights. Leave the cockpit as you found it.",
+    "Monthly dues of $425 (M600) or $280 (SR22T) are due on the 1st. Members more than 30 days past due may not reserve aircraft until the account is current. Contact Treasurer James Wilson with billing questions.",
+    "Any incident, accident, or ATC enforcement action must be reported to the club Safety Officer within 24 hours. Cooperation with any NTSB or FAA investigation is mandatory.",
+    "The club Safety Officer has final authority on all airworthiness and safety matters. Any member may ground an aircraft they believe to be unsafe — no questions asked.",
+]
+
+CHECKLIST_S1 = {
+    "items": [
+        "AROW documents confirmed in aircraft: Airworthiness certificate, Registration, Operating handbook (POH/AFM), Weight & balance.",
+        "Fuel: Visually verify quantity in both tanks. Verify 100LL. Sump fuel from all drain points — check for water or contamination.",
+        "Oil: Check level (M600: 12–14 qt; SR22T: 7–8 qt). Inspect for leaks. Secure oil cap.",
+        "Exterior walk-around: Flight controls, static ports, pitot tube (remove cover), antennas, landing gear/tires, lights, prop for nicks or cracks.",
+        "Oxygen (M600 only): Check O₂ quantity if planning flight above 12,500 MSL. Connect masks and verify flow.",
+        "Avionics: Verify database currency. Set altimeter — Flagstaff field elevation 7,014 ft MSL.",
+        "Engine start per POH/AFM. Monitor oil pressure (green arc within 30 sec).",
+        "ATIS received. Clearance obtained if IFR. Transponder set and confirmed with tower.",
+        "Taxi check: Controls free and correct, flight instruments alive, brakes checked.",
+        "Run-up: Magnetos checked, prop cycle, all engine instruments in green.",
+        "Before takeoff briefing: Abort point, emergency return plan, passengers briefed on exits and safety equipment.",
+        "Post-landing: Taxi clear of runway, complete after-landing checklist, transponder to GND/STBY.",
+        "Shutdown: Log Hobbs time before shutdown. Complete engine shutdown per POH. Secure aircraft: control lock, master off, chocks, tie-downs.",
+        "Squawk book: Record any discrepancies before leaving. If any system is inoperative, placard it per MEL/POH.",
+    ],
+    "categories": [],
+    "disclaimer": "Aviation involves inherent risks. The Pilot-in-Command accepts full responsibility for the safe operation of the aircraft and compliance with all applicable FARs. Summit Ridge Flying Club, its officers, and members shall not be liable for any injury, death, or property damage arising from the use of club aircraft.",
+}
+
+RULES_S2 = [
+    "Membership is open to individuals 18 or older. All operators must hold a valid Wisconsin Boating Safety Certificate (required by DNR for anyone born after 1989) before operating any club vessel.",
+    "<strong>Complete the Captain's Checklist before every departure</strong> — no exceptions. A thorough pre-departure check prevents the majority of on-water incidents.",
+    "Life jackets: Ensure an appropriately-sized USCG-approved PFD is available and accessible for every person aboard before leaving the dock. Children under 13 must wear their PFD at all times underway.",
+    "Return all vessels with a <strong>full fuel tank</strong>. Fuel up at Riviera Marina or Fontana Bay before returning to the slip. Log gallons added in FleetNests.",
+    "Vessel capacity: The Bennington 24 SSBXP is rated for <strong>11 persons maximum</strong>. The Catalina 275 Sport: 6 persons. The MasterCraft X22: 15 persons (surf config: 6 recommended). Never exceed posted capacity.",
+    "MasterCraft X22 orientation required: No member may operate the X22 without completing the club's ballast and surf-system orientation session with a certified instructor. Sign up in FleetNests.",
+    "Speed limits: Observe Wisconsin's <strong>no-wake within 100 ft of shore</strong> and all posted limits. Lake Geneva enforces a 35 MPH limit in open water. Wakeboarding is permitted in designated areas only.",
+    "Weather: If NOAA issues a Small Craft Advisory or Thunderstorm Watch for Lake Geneva, return to dock immediately. Monitor VHF Ch. 16. Do not depart if lightning is visible within 10 miles.",
+    "Damage: Any collision, grounding, equipment failure, or injury must be reported to Club Manager Rachel Bennett within 2 hours. Document with photos. Members are responsible for damages caused during their reservation.",
+    "Cleanliness: Rinse the vessel with fresh water after every use. Remove all personal items and trash. Leave the cockpit, cabin, and head (Catalina) clean for the next member.",
+    "Monthly dues are due on the 1st. Members more than 30 days past due may not make reservations until the account is current. Contact Rachel Bennett with billing questions.",
+    "The Club Manager has final authority on all safety, maintenance, and conduct matters. Any member may remove a vessel from service if they believe it is unsafe — notify the club immediately.",
+]
+
+CHECKLIST_S2 = {
+    "items": [
+        "Life jackets: Count PFDs — one per person. Children's PFDs are in the forward compartment (Catalina) or under port seat (Bennington, X22).",
+        "Fuel: Check level gauge. Plan to return full. Catalina: diesel at Riviera. Bennington/X22: premium unleaded at Fontana Bay or Riviera.",
+        "Engine: Check oil level (X22: before every trip). Inspect raw water strainer (Catalina). Check bilge — pump out if any standing water.",
+        "Safety equipment: Fire extinguisher (port side). Flares (check expiry date). Throwable cushion. First-aid kit.",
+        "Electronics: VHF radio on and tested on Ch. 16. Navigation lights functional (required after sunset). GPS on.",
+        "Lines and fenders: All dock lines and fenders stowed or aboard. Shore power cord removed (Catalina) and stowed.",
+        "Blower: Run engine blower minimum 4 minutes before starting gas engines (Bennington, X22). Check for fuel smell before proceeding.",
+        "Engine start: Normal start per vessel manual. Confirm water flow from exhaust (cooling). Idle warm-up 3–5 minutes.",
+        "Cast off: Walk the dock — confirm no lines, fenders, or obstacles fouling the hull or prop.",
+        "Underway check: Throttle, steering, bilge pump switch, all instruments normal. No-wake until clear of marina channel.",
+        "X22 ballast (if surfing): Enable Surf System. Activate ballast fill per goofy/regular selection. Follow club guidelines on max ballast for Lake Geneva.",
+        "Return: No-wake approaching slip. Flush engine with fresh water if applicable. Log trip and fuel in FleetNests. Fuel up before returning if under ½ tank.",
+        "Secure: Lines bow and stern. Shore power connected (Catalina). Bimini up (Bennington). Cover snapped. Log any squawks in FleetNests before leaving.",
+    ],
+    "categories": [],
+    "disclaimer": "Boating involves inherent risks. The Captain and all passengers accept responsibility for any damage, injury, or claims arising from use of Clearwater Boat Club vessels, and agree to indemnify and hold the club, its officers, and members harmless. The club shall not be liable for any physical, financial, or other damages.",
+}
+
+
+def seed_settings(get_conn, rules, checklist, phone_key, phone_val, extra_settings=None):
+    db = get_conn()
+    cur = db.cursor()
+    upsert_setting(cur, "member_rules_json", json.dumps(rules))
+    upsert_setting(cur, "checklist_json", json.dumps(checklist))
+    upsert_setting(cur, phone_key, phone_val)
+    for k, v in (extra_settings or {}).items():
+        upsert_setting(cur, k, v)
+    db.commit()
+    cur.close()
+    db.close()
+
+
 # ── main ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -387,6 +481,9 @@ if __name__ == "__main__":
         primary_color="#1A3A5C",   # deep aviation blue
         accent_color="#D4AF37",    # gold
     )
+    seed_settings(conn1, RULES_S1, CHECKLIST_S1,
+                  phone_key="fbo_phone", phone_val="928-213-2900",
+                  extra_settings={"aviation_station": "KFLG"})
 
     print("\nSeeding Sample 2 — Clearwater Boat Club …")
     seed_club(
@@ -395,5 +492,8 @@ if __name__ == "__main__":
         primary_color="#005F6B",   # teal/lake green
         accent_color="#F4A261",    # warm coral/orange
     )
+    seed_settings(conn2, RULES_S2, CHECKLIST_S2,
+                  phone_key="marina_phone", phone_val="262-248-6200",
+                  extra_settings={"weather_zone": "WIZ064", "nws_county": "WIC127"})
 
     print("\nDone.")
