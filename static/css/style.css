@@ -412,3 +412,59 @@ h6.text-uppercase.text-muted {
   .club-hero { height: 180px; }
   .club-hero-title { font-size: 1.4rem; }
 }
+
+/* ── Demo site banner ── */
+.demo-banner {
+  background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+  color: #e0e0e0;
+  font-size: 0.82rem;
+  padding: 0.45rem 1rem;
+  border-bottom: 2px solid var(--club-accent, #C9A84C);
+  position: sticky;
+  top: 0;
+  z-index: 1060;
+}
+.demo-banner-inner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  max-width: 1140px;
+  margin: 0 auto;
+}
+.demo-badge {
+  background: var(--club-accent, #C9A84C);
+  color: #1a1a2e;
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.demo-text code {
+  background: rgba(255,255,255,0.12);
+  color: #ffd166;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.82rem;
+}
+.demo-reset {
+  margin-left: auto;
+  color: rgba(255,255,255,0.5);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+/* Login page demo hint card */
+.demo-login-hint {
+  background: linear-gradient(135deg, #e8f4f8 0%, #d4edf7 100%) !important;
+  border-left: 4px solid #0ea5e9 !important;
+}
+.demo-creds {
+  background: rgba(0,0,0,0.06);
+  font-size: 0.88rem;
+}
+.demo-creds code {
+  color: #0c4a6e;
+  font-weight: 600;
+}
