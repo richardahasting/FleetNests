@@ -155,4 +155,250 @@
     </form>
   </div>
 </div>
+
+{# ── Branding ─────────────────────────────────────────────────────────── #}
+<div class="row mt-4">
+  <div class="col-12 col-lg-9">
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-club-blue text-white fw-semibold">
+        <i class="bi bi-palette me-2"></i>Club Branding
+      </div>
+      <div class="card-body">
+
+        {# Colors #}
+        <h6 class="text-uppercase text-muted mb-3">Theme Colors</h6>
+        <form method="POST" action="{{ url_for('admin_branding') }}" class="mb-4">
+          <input type="hidden" name="action" value="colors">
+          <div class="row g-3 align-items-end">
+            <div class="col-auto">
+              <label class="form-label small fw-semibold">Primary Color</label>
+              <div class="d-flex align-items-center gap-2">
+                <input type="color" name="primary_color" class="form-control form-control-color"
+                       value="{{ branding.primary_color or '#0A2342' }}" style="width:52px;height:38px;">
+                <input type="text" name="primary_color_hex" class="form-control form-control-sm"
+                       value="{{ branding.primary_color or '#0A2342' }}" style="width:90px;"
+                       pattern="^#[0-9a-fA-F]{6}$" readonly>
+              </div>
+            </div>
+            <div class="col-auto">
+              <label class="form-label small fw-semibold">Accent Color</label>
+              <div class="d-flex align-items-center gap-2">
+                <input type="color" name="accent_color" class="form-control form-control-color"
+                       value="{{ branding.accent_color or '#C9A84C' }}" style="width:52px;height:38px;">
+                <input type="text" name="accent_color_hex" class="form-control form-control-sm"
+                       value="{{ branding.accent_color or '#C9A84C' }}" style="width:90px;"
+                       pattern="^#[0-9a-fA-F]{6}$" readonly>
+              </div>
+            </div>
+            <div class="col-auto">
+              <button type="submit" class="btn btn-club-blue btn-sm">
+                <i class="bi bi-palette me-1"></i>Apply Colors
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <hr class="divider-gold">
+
+        {# Logo #}
+        <h6 class="text-uppercase text-muted mb-3">Club Logo</h6>
+        <div class="row g-3 align-items-start mb-4">
+          <div class="col-auto">
+            <div class="p-2 border rounded" style="background:var(--club-primary);display:inline-block;">
+              <img src="{{ url_for('club_logo') }}" alt="Current logo"
+                   style="height:60px;width:auto;max-width:160px;object-fit:contain;">
+            </div>
+            <div class="form-text">Current logo (shown on navbar)</div>
+          </div>
+          <div class="col">
+            <form method="POST" action="{{ url_for('admin_branding') }}" enctype="multipart/form-data">
+              <input type="hidden" name="action" value="logo">
+              <label class="form-label small fw-semibold">Upload new logo</label>
+              <div class="d-flex gap-2">
+                <input type="file" name="logo" class="form-control form-control-sm"
+                       accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml">
+                <button type="submit" class="btn btn-club-blue btn-sm text-nowrap">Upload</button>
+              </div>
+              <div class="form-text">PNG, SVG, or WebP recommended · max 5 MB</div>
+            </form>
+            {% if branding.logo_data %}
+            <form method="POST" action="{{ url_for('admin_branding') }}" class="mt-2">
+              <input type="hidden" name="action" value="delete_logo">
+              <button type="submit" class="btn btn-outline-danger btn-sm">
+                <i class="bi bi-trash me-1"></i>Remove Logo
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+
+        <hr class="divider-gold">
+
+        {# Hero image #}
+        <h6 class="text-uppercase text-muted mb-3">Hero Banner Image</h6>
+        {% if branding.hero_data %}
+        <div class="mb-3 rounded overflow-hidden shadow-sm" style="max-height:160px;">
+          <img src="{{ url_for('club_hero') }}" alt="Hero image"
+               style="width:100%;height:160px;object-fit:cover;">
+        </div>
+        {% endif %}
+        <form method="POST" action="{{ url_for('admin_branding') }}" enctype="multipart/form-data" class="mb-2">
+          <input type="hidden" name="action" value="hero">
+          <div class="d-flex gap-2">
+            <input type="file" name="hero" class="form-control form-control-sm"
+                   accept="image/jpeg,image/png,image/gif,image/webp">
+            <button type="submit" class="btn btn-club-blue btn-sm text-nowrap">Upload</button>
+          </div>
+          <div class="form-text">Shown as banner on the calendar page · Landscape, min 1200px wide recommended · max 5 MB</div>
+        </form>
+        {% if branding.hero_data %}
+        <form method="POST" action="{{ url_for('admin_branding') }}">
+          <input type="hidden" name="action" value="delete_hero">
+          <button type="submit" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash me-1"></i>Remove Hero Image
+          </button>
+        </form>
+        {% endif %}
+
+      </div>
+    </div>
+
+    {# ── Vehicle Photos ── #}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-club-blue text-white fw-semibold">
+        <i class="bi bi-image me-2"></i>
+        {% if is_plane %}Aircraft Photos{% else %}Vessel Photos{% endif %}
+      </div>
+      <div class="card-body">
+        <p class="text-muted small">The primary photo is shown on the reservation page.</p>
+
+        {% set vphotos = vehicle_photos %}
+        {% if vphotos %}
+        <div class="row g-2 mb-3">
+          {% for vp in vphotos %}
+          <div class="col-6 col-md-4">
+            <div class="position-relative rounded overflow-hidden shadow-sm"
+                 style="aspect-ratio:4/3;background:var(--sand-dark);">
+              <img src="{{ url_for('vehicle_photo', photo_id=vp.id) }}"
+                   alt="{{ vp.caption or 'Vehicle photo' }}"
+                   class="w-100 h-100" style="object-fit:cover;">
+              {% if vp.is_primary %}
+              <span class="badge bg-warning text-dark position-absolute top-0 start-0 m-1">
+                <i class="bi bi-star-fill me-1"></i>Primary
+              </span>
+              {% endif %}
+              {% if vp.caption %}
+              <div class="position-absolute bottom-0 start-0 end-0 px-2 py-1 small text-white"
+                   style="background:rgba(0,0,0,0.55);">{{ vp.caption }}</div>
+              {% endif %}
+            </div>
+            <div class="d-flex gap-1 mt-1">
+              {% if not vp.is_primary %}
+              <form method="POST" action="{{ url_for('admin_vehicle_photo_set_primary', photo_id=vp.id) }}">
+                <button class="btn btn-outline-warning btn-sm py-0 px-1" title="Set as primary">
+                  <i class="bi bi-star"></i>
+                </button>
+              </form>
+              {% endif %}
+              <form method="POST" action="{{ url_for('admin_vehicle_photo_delete', photo_id=vp.id) }}"
+                    onsubmit="return confirm('Delete this photo?')">
+                <button class="btn btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-trash"></i></button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('admin_vehicle_photo_upload') }}" enctype="multipart/form-data">
+          <div class="row g-2 align-items-end">
+            <div class="col">
+              <input type="file" name="photo" class="form-control form-control-sm"
+                     accept="image/jpeg,image/png,image/gif,image/webp" required>
+            </div>
+            <div class="col-auto">
+              <input type="text" name="caption" class="form-control form-control-sm"
+                     placeholder="Caption (optional)" style="width:160px;">
+            </div>
+            <div class="col-auto">
+              <div class="form-check form-check-inline mb-0">
+                <input class="form-check-input" type="checkbox" name="is_primary" value="1" id="vp_primary">
+                <label class="form-check-label small" for="vp_primary">Set as primary</label>
+              </div>
+            </div>
+            <div class="col-auto">
+              <button type="submit" class="btn btn-club-blue btn-sm">
+                <i class="bi bi-upload me-1"></i>Upload
+              </button>
+            </div>
+          </div>
+          <div class="form-text">JPEG, PNG, GIF, or WebP · max 10 MB</div>
+        </form>
+      </div>
+    </div>
+
+    {# ── Gallery Photos ── #}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-club-blue text-white fw-semibold">
+        <i class="bi bi-images me-2"></i>Photo Gallery
+      </div>
+      <div class="card-body">
+        <p class="text-muted small">Photos shown on the public Gallery page visible to all members.</p>
+
+        {% set gphotos = gallery_photos %}
+        {% if gphotos %}
+        <div class="gallery-grid mb-3" style="--min:160px;">
+          {% for gp in gphotos %}
+          <div class="gallery-item">
+            <img src="{{ url_for('club_photo', photo_id=gp.id) }}"
+                 alt="{{ gp.title or 'Gallery photo' }}" loading="lazy">
+            {% if gp.title %}
+            <div class="gallery-item-caption">{{ gp.title }}</div>
+            {% endif %}
+            <form method="POST" action="{{ url_for('admin_photo_delete', photo_id=gp.id) }}"
+                  style="position:absolute;top:0.4rem;right:0.4rem;"
+                  onsubmit="return confirm('Delete this photo?')">
+              <button class="btn btn-danger btn-sm py-0 px-1"><i class="bi bi-trash"></i></button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('admin_photo_upload') }}" enctype="multipart/form-data">
+          <div class="row g-2 align-items-end">
+            <div class="col">
+              <input type="file" name="photo" class="form-control form-control-sm"
+                     accept="image/jpeg,image/png,image/gif,image/webp" required>
+            </div>
+            <div class="col-auto">
+              <input type="text" name="title" class="form-control form-control-sm"
+                     placeholder="Caption (optional)" style="width:180px;">
+            </div>
+            <div class="col-auto">
+              <button type="submit" class="btn btn-club-blue btn-sm">
+                <i class="bi bi-upload me-1"></i>Add to Gallery
+              </button>
+            </div>
+          </div>
+          <div class="form-text">JPEG, PNG, GIF, or WebP · max 10 MB</div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% block scripts %}
+<script>
+document.querySelectorAll('input[type=color]').forEach(function(picker) {
+  var hex = picker.nextElementSibling;
+  picker.addEventListener('input', function() { hex.value = picker.value; });
+  hex.addEventListener('input', function() {
+    if (/^#[0-9a-fA-F]{6}$/.test(hex.value)) picker.value = hex.value;
+  });
+  picker.closest('form').addEventListener('submit', function() {
+    hex.removeAttribute('name');
+  });
+});
+</script>
 {% endblock %}

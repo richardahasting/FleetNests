@@ -11,8 +11,20 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-  <meta name="theme-color" content="#0A2342">
+  <meta name="theme-color" content="{{ branding.primary_color or '#0A2342' }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+  {# Per-club color theme injection #}
+  <style>
+    :root {
+      --club-primary:       {{ branding.primary_color or '#0A2342' }};
+      --club-primary-dark:  color-mix(in srgb, {{ branding.primary_color or '#0A2342' }} 70%, #000);
+      --club-primary-mid:   color-mix(in srgb, {{ branding.primary_color or '#0A2342' }} 85%, #fff);
+      --club-primary-light: color-mix(in srgb, {{ branding.primary_color or '#0A2342' }} 75%, #fff);
+      --club-accent:        {{ branding.accent_color or '#C9A84C' }};
+      --club-accent-dark:   color-mix(in srgb, {{ branding.accent_color or '#C9A84C' }} 80%, #000);
+      --club-accent-light:  color-mix(in srgb, {{ branding.accent_color or '#C9A84C' }} 70%, #fff);
+    }
+  </style>
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -21,9 +33,9 @@
 <nav class="navbar navbar-expand-md navbar-dark bg-club-blue">
   <div class="container-fluid">
     <a class="navbar-brand" href="{{ url_for('calendar') }}">
-      <img src="{{ url_for('static', filename='images/badge.svg') }}"
+      <img src="{{ url_for('club_logo') }}"
            class="brand-badge" alt="{{ club.name if club else 'ClubReserve' }}"
-           width="34" height="34" style="height:34px;width:34px;flex-shrink:0">
+           width="34" height="34" style="height:34px;width:auto;max-width:120px;flex-shrink:0">
       {{ club.name if club else 'ClubReserve' }}
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
@@ -57,6 +69,10 @@
         <li class="nav-item">
           <a class="nav-link {% if request.endpoint == 'statements' %}active{% endif %}"
              href="{{ url_for('statements') }}"><i class="bi bi-file-earmark-pdf me-1"></i>Statements</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'gallery' %}active{% endif %}"
+             href="{{ url_for('gallery') }}"><i class="bi bi-images me-1"></i>Gallery</a>
         </li>
         <li class="nav-item">
           <a class="nav-link {% if request.endpoint == 'help_page' %}active{% endif %}"

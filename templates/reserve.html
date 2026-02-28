@@ -12,6 +12,17 @@
       <h5 class="mb-0 fw-bold">{{ day.strftime('%A, %B %d, %Y') }}</h5>
     </div>
 
+    {% if vehicle_photo %}
+    <div class="vehicle-photo-card mb-3 shadow-sm">
+      <img src="{{ url_for('vehicle_photo', photo_id=vehicle_photo.id) }}"
+           alt="{{ vehicle_photo.caption or ('The ' + (club.name if club else 'Club') + ' vessel') }}"
+           class="w-100" style="max-height:240px;object-fit:cover;">
+      {% if vehicle_photo.caption %}
+      <div class="px-3 py-2 small text-muted bg-white">{{ vehicle_photo.caption }}</div>
+      {% endif %}
+    </div>
+    {% endif %}
+
     {# ---- Existing reservations for this day ---- #}
     {% if existing %}
     <div class="card border-0 shadow-sm mb-3">

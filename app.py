@@ -11,7 +11,7 @@ load_dotenv()
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    flash, session, jsonify, abort, g
+    flash, session, jsonify, abort, g, Response
 )
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -54,9 +54,15 @@ def create_app():
         club = getattr(g, "club", None)
         vtype = getattr(g, "vehicle_type", "boat")
         settings = {}
+        branding = {"primary_color": "#0A2342", "accent_color": "#C9A84C",
+                    "logo_data": None, "hero_data": None}
         if club:
             try:
                 settings = models.get_all_club_settings()
+            except Exception:
+                pass
+            try:
+                branding = models.get_branding()
             except Exception:
                 pass
         return {
@@ -67,6 +73,7 @@ def create_app():
             "is_boat":        vtype == "boat",
             "is_plane":       vtype == "plane",
             "club_settings":  settings,
+            "branding":       branding,
         }
 
     # Custom error pages
@@ -245,10 +252,12 @@ def register_routes(app: Flask):
 
         user_res_ids = {r["user_id"] for r in existing}
         on_waitlist  = models.is_on_waitlist(eff_id, day)
+        vehicle_photo = models.get_primary_vehicle_photo()
         return render_template("reserve.html", day=day, existing=existing, today=date.today(),
                                user_has_res=eff_id in user_res_ids,
                                on_waitlist=on_waitlist,
-                               day_is_fully_booked=models.is_day_fully_booked(existing))
+                               day_is_fully_booked=models.is_day_fully_booked(existing),
+                               vehicle_photo=vehicle_photo)
 
     @app.route("/cancel/<int:res_id>", methods=["POST"])
     @auth.login_required
@@ -1085,7 +1094,9 @@ def register_routes(app: Flask):
         settings = models.get_all_club_settings()
         return render_template("admin/settings.html", settings=settings,
                                vehicle_type=vtype,
-                               default_hours_label=vehicle_types.get_hours_label(vtype))
+                               default_hours_label=vehicle_types.get_hours_label(vtype),
+                               vehicle_photos=models.get_vehicle_photos(),
+                               gallery_photos=models.get_club_photos())
 
     # -- Password reset / welcome set-password --------------------------------
 
@@ -1173,6 +1184,194 @@ def register_routes(app: Flask):
         models.log_action(user["id"], "feedback_submitted", None, None,
                           {"action": action, "length": len(text)})
         return jsonify({"ok": True, "action": action})
+
+
+# ---------------------------------------------------------------------------
+# Club branding & photo routes
+# ---------------------------------------------------------------------------
+
+    @app.route("/club-logo")
+    def club_logo():
+        """Serve the club logo image."""
+        branding = models.get_branding()
+        if not branding.get("logo_data"):
+            return app.send_static_file("images/badge.svg")
+        return Response(
+            bytes(branding["logo_data"]),
+            content_type=branding["logo_content_type"] or "image/png",
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+
+    @app.route("/club-hero")
+    def club_hero():
+        """Serve the club hero/banner image."""
+        branding = models.get_branding()
+        if not branding.get("hero_data"):
+            abort(404)
+        return Response(
+            bytes(branding["hero_data"]),
+            content_type=branding["hero_content_type"] or "image/jpeg",
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+
+    @app.route("/gallery")
+    @auth.login_required
+    def gallery():
+        """Club photo gallery page."""
+        photos = models.get_club_photos()
+        return render_template("gallery.html", photos=photos)
+
+    @app.route("/club-photo/<int:photo_id>")
+    @auth.login_required
+    def club_photo(photo_id: int):
+        """Serve a gallery photo."""
+        photo = models.get_club_photo(photo_id)
+        if not photo:
+            abort(404)
+        return Response(
+            bytes(photo["photo_data"]),
+            content_type=photo["content_type"] or "image/jpeg",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+
+    @app.route("/vehicle-photo/<int:photo_id>")
+    @auth.login_required
+    def vehicle_photo(photo_id: int):
+        """Serve a vehicle photo."""
+        photo = models.get_vehicle_photo(photo_id)
+        if not photo:
+            abort(404)
+        return Response(
+            bytes(photo["photo_data"]),
+            content_type=photo["content_type"] or "image/jpeg",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+
+    # -- Admin branding & photos --------------------------------------------
+
+    @app.route("/admin/branding", methods=["POST"])
+    @auth.require_admin
+    def admin_branding():
+        """Update club colors and/or logo/hero images."""
+        action = request.form.get("action", "")
+        ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"}
+        MAX_SIZE = 5 * 1024 * 1024
+
+        if action == "colors":
+            primary = request.form.get("primary_color", "#0A2342").strip()
+            accent  = request.form.get("accent_color",  "#C9A84C").strip()
+            if not (primary.startswith("#") and len(primary) == 7):
+                flash("Invalid primary color.", "danger")
+                return redirect(url_for("admin_settings"))
+            if not (accent.startswith("#") and len(accent) == 7):
+                flash("Invalid accent color.", "danger")
+                return redirect(url_for("admin_settings"))
+            models.update_branding_colors(primary, accent)
+            flash("Colors updated.", "success")
+
+        elif action == "logo":
+            f = request.files.get("logo")
+            if f and f.filename:
+                if f.content_type not in ALLOWED_TYPES:
+                    flash("Logo must be an image file.", "danger")
+                    return redirect(url_for("admin_settings"))
+                data = f.read(MAX_SIZE + 1)
+                if len(data) > MAX_SIZE:
+                    flash("Logo must be 5 MB or smaller.", "danger")
+                    return redirect(url_for("admin_settings"))
+                models.update_branding_logo(data, f.content_type)
+                flash("Logo updated.", "success")
+
+        elif action == "delete_logo":
+            models.delete_branding_logo()
+            flash("Logo removed.", "success")
+
+        elif action == "hero":
+            f = request.files.get("hero")
+            if f and f.filename:
+                if f.content_type not in ALLOWED_TYPES:
+                    flash("Hero image must be an image file.", "danger")
+                    return redirect(url_for("admin_settings"))
+                data = f.read(MAX_SIZE + 1)
+                if len(data) > MAX_SIZE:
+                    flash("Hero image must be 5 MB or smaller.", "danger")
+                    return redirect(url_for("admin_settings"))
+                models.update_branding_hero(data, f.content_type)
+                flash("Hero image updated.", "success")
+
+        elif action == "delete_hero":
+            models.delete_branding_hero()
+            flash("Hero image removed.", "success")
+
+        return redirect(url_for("admin_settings"))
+
+    @app.route("/admin/photos/upload", methods=["POST"])
+    @auth.require_admin
+    def admin_photo_upload():
+        """Upload a gallery photo."""
+        user = auth.current_user()
+        ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+        MAX_SIZE = 10 * 1024 * 1024
+        f = request.files.get("photo")
+        if not f or not f.filename:
+            flash("No file selected.", "danger")
+            return redirect(url_for("admin_settings"))
+        if f.content_type not in ALLOWED_TYPES:
+            flash("Gallery photos must be JPEG, PNG, GIF, or WebP.", "danger")
+            return redirect(url_for("admin_settings"))
+        data = f.read(MAX_SIZE + 1)
+        if len(data) > MAX_SIZE:
+            flash("Photo must be 10 MB or smaller.", "danger")
+            return redirect(url_for("admin_settings"))
+        title = request.form.get("title", "").strip() or None
+        models.add_club_photo(title, data, f.content_type, user["id"])
+        flash("Photo added to gallery.", "success")
+        return redirect(url_for("admin_settings"))
+
+    @app.route("/admin/photos/<int:photo_id>/delete", methods=["POST"])
+    @auth.require_admin
+    def admin_photo_delete(photo_id: int):
+        """Delete a gallery photo."""
+        models.delete_club_photo(photo_id)
+        flash("Photo deleted.", "success")
+        return redirect(url_for("admin_settings"))
+
+    @app.route("/admin/vehicle-photos/upload", methods=["POST"])
+    @auth.require_admin
+    def admin_vehicle_photo_upload():
+        """Upload a vehicle photo."""
+        ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+        MAX_SIZE = 10 * 1024 * 1024
+        f = request.files.get("photo")
+        if not f or not f.filename:
+            flash("No file selected.", "danger")
+            return redirect(url_for("admin_settings"))
+        if f.content_type not in ALLOWED_TYPES:
+            flash("Vehicle photos must be JPEG, PNG, GIF, or WebP.", "danger")
+            return redirect(url_for("admin_settings"))
+        data = f.read(MAX_SIZE + 1)
+        if len(data) > MAX_SIZE:
+            flash("Photo must be 10 MB or smaller.", "danger")
+            return redirect(url_for("admin_settings"))
+        caption   = request.form.get("caption", "").strip() or None
+        is_primary = request.form.get("is_primary") == "1"
+        models.add_vehicle_photo(caption, data, f.content_type, is_primary)
+        flash("Vehicle photo added.", "success")
+        return redirect(url_for("admin_settings"))
+
+    @app.route("/admin/vehicle-photos/<int:photo_id>/set-primary", methods=["POST"])
+    @auth.require_admin
+    def admin_vehicle_photo_set_primary(photo_id: int):
+        models.set_primary_vehicle_photo(photo_id)
+        flash("Primary vehicle photo updated.", "success")
+        return redirect(url_for("admin_settings"))
+
+    @app.route("/admin/vehicle-photos/<int:photo_id>/delete", methods=["POST"])
+    @auth.require_admin
+    def admin_vehicle_photo_delete(photo_id: int):
+        models.delete_vehicle_photo(photo_id)
+        flash("Vehicle photo deleted.", "success")
+        return redirect(url_for("admin_settings"))
 
 
 # ---------------------------------------------------------------------------

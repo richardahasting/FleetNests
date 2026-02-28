@@ -235,6 +235,51 @@ CREATE TABLE IF NOT EXISTS statements (
 );
 
 -- -------------------------------------------------------------------------
+-- Club branding (colors, logo, hero image)
+-- -------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS club_branding (
+    id                 SERIAL PRIMARY KEY,
+    primary_color      VARCHAR(7) DEFAULT '#0A2342',
+    accent_color       VARCHAR(7) DEFAULT '#C9A84C',
+    logo_data          BYTEA,
+    logo_content_type  VARCHAR(50),
+    hero_data          BYTEA,
+    hero_content_type  VARCHAR(50),
+    updated_at         TIMESTAMP DEFAULT NOW()
+);
+
+-- Seed one row (always exactly one)
+INSERT INTO club_branding (primary_color, accent_color) VALUES ('#0A2342', '#C9A84C') ON CONFLICT DO NOTHING;
+
+-- -------------------------------------------------------------------------
+-- Club photo gallery
+-- -------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS club_photos (
+    id           SERIAL PRIMARY KEY,
+    title        VARCHAR(100),
+    photo_data   BYTEA NOT NULL,
+    content_type VARCHAR(50) NOT NULL DEFAULT 'image/jpeg',
+    sort_order   INTEGER DEFAULT 0,
+    uploaded_by  INTEGER REFERENCES users(id),
+    uploaded_at  TIMESTAMP DEFAULT NOW()
+);
+
+-- -------------------------------------------------------------------------
+-- Vehicle photos
+-- -------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS vehicle_photos (
+    id           SERIAL PRIMARY KEY,
+    caption      VARCHAR(200),
+    photo_data   BYTEA NOT NULL,
+    content_type VARCHAR(50) NOT NULL DEFAULT 'image/jpeg',
+    is_primary   BOOLEAN DEFAULT FALSE,
+    uploaded_at  TIMESTAMP DEFAULT NOW()
+);
+
+-- -------------------------------------------------------------------------
 -- Indexes
 -- -------------------------------------------------------------------------
 

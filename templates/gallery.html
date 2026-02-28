@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Gallery — {{ club.name if club else 'ClubReserve' }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h5 class="mb-0 fw-bold">
+    <i class="bi bi-images me-2 text-club-blue"></i>{{ club.name if club else 'Club' }} Gallery
+  </h5>
+</div>
+
+{% if photos %}
+<div class="gallery-grid">
+  {% for photo in photos %}
+  <div class="gallery-item">
+    <img src="{{ url_for('club_photo', photo_id=photo.id) }}"
+         alt="{{ photo.title or 'Club photo' }}"
+         loading="lazy">
+    {% if photo.title %}
+    <div class="gallery-item-caption">{{ photo.title }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-images" style="font-size:3rem;opacity:0.3;"></i>
+  <p class="mt-3">No photos yet. Admins can add photos in Settings → Photos.</p>
+</div>
+{% endif %}
+{% endblock %}

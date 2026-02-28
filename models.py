@@ -1016,3 +1016,126 @@ def get_all_feedback_submissions() -> list:
         "JOIN users u ON u.id = f.user_id "
         "ORDER BY f.submitted_at DESC"
     )
+
+
+# ---------------------------------------------------------------------------
+# Club branding
+# ---------------------------------------------------------------------------
+
+def get_branding() -> dict:
+    """Return the single club_branding row (colors, logo, hero)."""
+    row = db.fetchone("SELECT * FROM club_branding LIMIT 1")
+    if not row:
+        return {"primary_color": "#0A2342", "accent_color": "#C9A84C",
+                "logo_data": None, "logo_content_type": None,
+                "hero_data": None, "hero_content_type": None}
+    return dict(row)
+
+
+def update_branding_colors(primary_color: str, accent_color: str):
+    db.execute(
+        "UPDATE club_branding SET primary_color = %s, accent_color = %s, updated_at = NOW()",
+        (primary_color, accent_color), fetch=False,
+    )
+
+
+def update_branding_logo(data: bytes, content_type: str):
+    db.execute(
+        "UPDATE club_branding SET logo_data = %s, logo_content_type = %s, updated_at = NOW()",
+        (data, content_type), fetch=False,
+    )
+
+
+def update_branding_hero(data: bytes, content_type: str):
+    db.execute(
+        "UPDATE club_branding SET hero_data = %s, hero_content_type = %s, updated_at = NOW()",
+        (data, content_type), fetch=False,
+    )
+
+
+def delete_branding_logo():
+    db.execute(
+        "UPDATE club_branding SET logo_data = NULL, logo_content_type = NULL, updated_at = NOW()",
+        fetch=False,
+    )
+
+
+def delete_branding_hero():
+    db.execute(
+        "UPDATE club_branding SET hero_data = NULL, hero_content_type = NULL, updated_at = NOW()",
+        fetch=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Club photo gallery
+# ---------------------------------------------------------------------------
+
+def get_club_photos() -> list:
+    return db.execute(
+        "SELECT id, title, content_type, sort_order, uploaded_at "
+        "FROM club_photos ORDER BY sort_order, uploaded_at"
+    )
+
+
+def get_club_photo(photo_id: int) -> dict | None:
+    return db.fetchone("SELECT * FROM club_photos WHERE id = %s", (photo_id,))
+
+
+def add_club_photo(title: str | None, data: bytes, content_type: str,
+                   uploaded_by: int, sort_order: int = 0) -> int:
+    row = db.insert(
+        "INSERT INTO club_photos (title, photo_data, content_type, sort_order, uploaded_by) "
+        "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+        (title or None, data, content_type, sort_order, uploaded_by),
+    )
+    return row["id"]
+
+
+def delete_club_photo(photo_id: int):
+    db.execute("DELETE FROM club_photos WHERE id = %s", (photo_id,), fetch=False)
+
+
+# ---------------------------------------------------------------------------
+# Vehicle photos
+# ---------------------------------------------------------------------------
+
+def get_vehicle_photos() -> list:
+    return db.execute(
+        "SELECT id, caption, content_type, is_primary, uploaded_at "
+        "FROM vehicle_photos ORDER BY is_primary DESC, uploaded_at"
+    )
+
+
+def get_vehicle_photo(photo_id: int) -> dict | None:
+    return db.fetchone("SELECT * FROM vehicle_photos WHERE id = %s", (photo_id,))
+
+
+def get_primary_vehicle_photo() -> dict | None:
+    return db.fetchone(
+        "SELECT * FROM vehicle_photos WHERE is_primary = TRUE LIMIT 1"
+    )
+
+
+def add_vehicle_photo(caption: str | None, data: bytes, content_type: str,
+                      is_primary: bool = False) -> int:
+    if is_primary:
+        db.execute("UPDATE vehicle_photos SET is_primary = FALSE", fetch=False)
+    row = db.insert(
+        "INSERT INTO vehicle_photos (caption, photo_data, content_type, is_primary) "
+        "VALUES (%s, %s, %s, %s) RETURNING id",
+        (caption or None, data, content_type, is_primary),
+    )
+    return row["id"]
+
+
+def set_primary_vehicle_photo(photo_id: int):
+    db.execute("UPDATE vehicle_photos SET is_primary = FALSE", fetch=False)
+    db.execute(
+        "UPDATE vehicle_photos SET is_primary = TRUE WHERE id = %s",
+        (photo_id,), fetch=False,
+    )
+
+
+def delete_vehicle_photo(photo_id: int):
+    db.execute("DELETE FROM vehicle_photos WHERE id = %s", (photo_id,), fetch=False)
