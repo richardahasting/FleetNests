@@ -51,14 +51,15 @@
     </div>
     {% endif %}
 
-{# ---- Waitlist button (only for future days with existing reservations) ---- #}
+{# ---- Waitlist / partial-booking notice ---- #}
 {% if day >= today and existing and not user_has_res %}
 <div class="card border-0 shadow-sm mb-3">
   <div class="card-body py-3 px-4">
+    {% if day_is_fully_booked %}
     <div class="d-flex justify-content-between align-items-center">
       <div>
         <div class="fw-semibold small">
-          This day is already reserved.
+          This day is fully booked.
           <a href="{{ url_for('help_page') }}#waitlist" class="text-muted ms-1"
              data-bs-toggle="tooltip" title="Help: How the waitlist works">
             <i class="bi bi-question-circle-fill" style="font-size:0.8rem"></i>
@@ -80,6 +81,11 @@
       </form>
       {% endif %}
     </div>
+    {% else %}
+    <div class="text-muted small">
+      <i class="bi bi-clock me-1"></i>Some time slots on this day are taken — additional slots are still available below.
+    </div>
+    {% endif %}
   </div>
 </div>
 {% endif %}

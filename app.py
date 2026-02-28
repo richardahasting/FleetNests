@@ -1,6 +1,6 @@
 """
-Bentley Boat Club Reservation System — Flask application.
-Portable: deploy at hastingtx.org/boat or on its own domain by changing APP_PREFIX.
+ClubReserve — Multi-club, multi-vehicle reservation platform.
+Forked from bentley-boat. Multi-tenant via subdomain routing.
 """
 
 import os
@@ -21,6 +21,8 @@ import auth
 import db
 import models
 import email_notify
+import club_resolver
+import vehicle_types
 
 CENTRAL = ZoneInfo("America/Chicago")
 
@@ -32,23 +34,40 @@ CENTRAL = ZoneInfo("America/Chicago")
 def create_app():
     app = Flask(__name__)
     app.secret_key = os.environ["SECRET_KEY"]
-    app.config["APPROVAL_REQUIRED"] = os.environ.get("APPROVAL_REQUIRED", "false").lower() == "true"
 
-    # Sub-path portability: set APPLICATION_ROOT for correct url_for() prefixing
+    # Sub-path portability
     prefix = os.environ.get("APP_PREFIX", "/")
     app.config["APPLICATION_ROOT"] = prefix
     app.config["PREFERRED_URL_SCHEME"] = "https"
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-    # Secure flag: True in production (HTTPS), False for local HTTP dev/testing
     app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"
 
     # Trust the reverse proxy (nginx) for host/scheme/prefix headers
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
-    # Make current_user available in all templates
+    # Register club resolver (sets g.club, g.vehicle_type, g.club_dsn per request)
+    club_resolver.init_app(app)
+
+    # Make current_user and club context available in all templates
     @app.context_processor
-    def inject_user():
-        return {"current_user": auth.current_user()}
+    def inject_context():
+        club = getattr(g, "club", None)
+        vtype = getattr(g, "vehicle_type", "boat")
+        settings = {}
+        if club:
+            try:
+                settings = models.get_all_club_settings()
+            except Exception:
+                pass
+        return {
+            "current_user":   auth.current_user(),
+            "current_sadmin": auth.current_super_admin(),
+            "club":           club,
+            "vehicle_type":   vtype,
+            "is_boat":        vtype == "boat",
+            "is_plane":       vtype == "plane",
+            "club_settings":  settings,
+        }
 
     # Custom error pages
     @app.errorhandler(403)
@@ -60,11 +79,12 @@ def create_app():
         return render_template("404.html"), 404
 
     register_routes(app)
+    register_superadmin_routes(app)
     return app
 
 
 # ---------------------------------------------------------------------------
-# Routes
+# Club routes
 # ---------------------------------------------------------------------------
 
 def register_routes(app: Flask):
@@ -87,7 +107,8 @@ def register_routes(app: Flask):
             password = request.form.get("password", "")
             user = auth.authenticate(username, password)
             if user:
-                auth.login_user(user)
+                club = getattr(g, "club", None)
+                auth.login_user(user, club_short_name=club["short_name"] if club else None)
                 return redirect(url_for("calendar"))
             flash("Invalid username or password.", "danger")
 
@@ -132,8 +153,6 @@ def register_routes(app: Flask):
             is_pending = (row["status"] == "pending_approval")
             color = "#ffc107" if is_pending else ("#0d6efd" if mine else "#6c757d")
             text_color = "#000000" if is_pending else "#ffffff"
-            # Attach Central Time offset so FullCalendar is unambiguous regardless
-            # of the viewer's browser timezone.
             start_ct = row["start_time"].replace(tzinfo=CENTRAL) if row["start_time"] else None
             end_ct   = row["end_time"].replace(tzinfo=CENTRAL)   if row["end_time"]   else None
             events.append({
@@ -171,6 +190,9 @@ def register_routes(app: Flask):
 
         user = auth.current_user()
         eff_id = models.get_effective_user_id(user)
+        vehicle_id = models.get_default_vehicle_id()
+        vtype = getattr(g, "vehicle_type", "boat")
+        settings = models.get_all_club_settings()
         existing = models.get_reservations_for_date(day)
 
         if request.method == "POST":
@@ -188,18 +210,28 @@ def register_routes(app: Flask):
                                        user_has_res=eff_id in user_res_ids,
                                        on_waitlist=on_waitlist)
 
-            error = models.validate_reservation(eff_id, start_dt, end_dt)
+            vnoun = vehicle_types.get_vehicle_noun(vtype)
+            error = models.validate_reservation(eff_id, start_dt, end_dt,
+                                                vehicle_id=vehicle_id, vehicle_noun=vnoun)
             if error:
                 flash(error, "danger")
             else:
-                approval = app.config.get("APPROVAL_REQUIRED", False)
-                status_after = "pending_approval" if approval else "active"
+                approval_setting = settings.get("approval_required", "false").lower() == "true"
+                status_after = "pending_approval" if approval_setting else "active"
                 result = models.make_reservation(eff_id, start_dt, end_dt, notes=notes,
-                                                 status=status_after)
+                                                 status=status_after, vehicle_id=vehicle_id)
+                if result is None:
+                    # Overlap detected under lock (concurrent submission race condition)
+                    flash("That time slot was just booked by another member. Please choose a different time.", "danger")
+                    existing = models.get_reservations_for_date(day)
+                    return render_template("reserve.html", day=day, existing=existing, today=date.today(),
+                                           user_has_res=eff_id in {r["user_id"] for r in existing},
+                                           on_waitlist=models.is_on_waitlist(eff_id, day),
+                                           day_is_fully_booked=models.is_day_fully_booked(existing))
                 models.log_action(user["id"], "reservation_created", "reservation",
-                                  result["id"] if result else None,
+                                  result["id"],
                                   {"date": res_date, "start": start_str, "end": end_str})
-                if approval:
+                if approval_setting:
                     flash(f"Reservation request submitted for {day.strftime('%B %d')} — awaiting admin approval.", "info")
                     admins = [u for u in models.get_all_active_users() if u["is_admin"]]
                     email_notify.notify_approval_needed(admins, user,
@@ -215,7 +247,8 @@ def register_routes(app: Flask):
         on_waitlist  = models.is_on_waitlist(eff_id, day)
         return render_template("reserve.html", day=day, existing=existing, today=date.today(),
                                user_has_res=eff_id in user_res_ids,
-                               on_waitlist=on_waitlist)
+                               on_waitlist=on_waitlist,
+                               day_is_fully_booked=models.is_day_fully_booked(existing))
 
     @app.route("/cancel/<int:res_id>", methods=["POST"])
     @auth.login_required
@@ -228,18 +261,15 @@ def register_routes(app: Flask):
             day = res["date"].strftime("%B %d, %Y")
             flash(f"Reservation for {day} cancelled.", "success")
             models.log_action(user["id"], "reservation_cancelled", "reservation", res_id)
-            # Notify the reservation owner if admin cancelled on their behalf
             if user["is_admin"] and res["user_id"] != user["id"]:
                 owner = models.get_user_by_id(res["user_id"])
                 if owner:
                     email_notify.notify_reservation_cancelled(owner, res)
             elif not user["is_admin"]:
                 email_notify.notify_reservation_cancelled(user, res)
-            # Notify waitlisted members that this slot is open
             models.notify_and_clear_waitlist(res["date"])
         else:
             flash("Could not cancel that reservation.", "danger")
-        # Redirect back to referring page (my-reservations or calendar)
         referrer = request.referrer or ""
         if "my-reservations" in referrer:
             return redirect(url_for("my_reservations"))
@@ -300,7 +330,6 @@ def register_routes(app: Flask):
                 if result:
                     msg_id = result["id"]
                     photos = request.files.getlist("photos")
-                    saved = 0
                     for f in photos[:5]:
                         if not f or not f.filename:
                             continue
@@ -310,7 +339,6 @@ def register_routes(app: Flask):
                         if len(data) > 5 * 1024 * 1024:
                             continue
                         models.add_message_photo(msg_id, data, f.content_type, f.filename)
-                        saved += 1
                 flash("Message posted.", "success")
                 return redirect(url_for("messages"))
         return render_template("message_form.html")
@@ -352,7 +380,6 @@ def register_routes(app: Flask):
             elif not password and not email:
                 flash("Provide either a password or an email address (for welcome email).", "danger")
             else:
-                # If no password supplied, set a random placeholder; member will set their own via email link
                 pw_hash = auth.hash_password(password) if password else auth.hash_password(secrets.token_urlsafe(32))
                 try:
                     row = models.create_user(username, full_name, email, pw_hash, is_admin,
@@ -471,11 +498,9 @@ def register_routes(app: Flask):
             headers={"Content-Disposition": "attachment; filename=reservations.csv"},
         )
 
-
     @app.route("/admin/audit-log")
     @auth.admin_required
     def admin_audit_log():
-        from datetime import timedelta
         days = int(request.args.get("days", 30))
         after = models.now_ct() - timedelta(days=days)
         entries = models.get_audit_log(limit=500, after_date=after)
@@ -513,7 +538,6 @@ def register_routes(app: Flask):
     def new_incident():
         user = auth.current_user()
         eff_id = models.get_effective_user_id(user)
-        # Allow linking to a specific past reservation
         res_id = request.args.get("res_id", type=int)
         res = models.get_reservation_by_id(res_id) if res_id else None
         if res and not user["is_admin"] and res["user_id"] != eff_id:
@@ -646,27 +670,30 @@ def register_routes(app: Flask):
         if not user:
             abort(404)
         reservations = models.get_user_ical_reservations(user["id"])
+        club = getattr(g, "club", {}) or {}
+        club_name = club.get("name", "Club")
+        vtype = club.get("vehicle_type", "boat")
+        vnoun = vehicle_types.get_vehicle_noun(vtype).title()
 
         lines = [
             "BEGIN:VCALENDAR",
             "VERSION:2.0",
-            "PRODID:-//Bentley Boat Club//Reservation System//EN",
-            "X-WR-CALNAME:My Boat Reservations",
+            f"PRODID:-//{club_name}//Reservation System//EN",
+            f"X-WR-CALNAME:My {vnoun} Reservations",
             "X-WR-TIMEZONE:America/Chicago",
             "CALSCALE:GREGORIAN",
             "METHOD:PUBLISH",
         ]
         for r in reservations:
-            # Format datetimes as YYYYMMDDTHHMMSS (floating / local time)
             def fmt(dt):
                 return dt.strftime("%Y%m%dT%H%M%S")
-            uid = f"res-{r['id']}@bentleyboatclub"
+            uid = f"res-{r['id']}@clubreserve"
             lines += [
                 "BEGIN:VEVENT",
                 f"UID:{uid}",
                 f"DTSTART;TZID=America/Chicago:{fmt(r['start_time'])}",
                 f"DTEND;TZID=America/Chicago:{fmt(r['end_time'])}",
-                f"SUMMARY:Boat Reservation",
+                f"SUMMARY:{vnoun} Reservation",
                 f"DESCRIPTION:{(r.get('notes') or '').replace(chr(10), ' ')}",
                 f"CREATED:{fmt(r['created_at'])}",
                 "END:VEVENT",
@@ -677,7 +704,7 @@ def register_routes(app: Flask):
         return Response(
             ics_content,
             mimetype="text/calendar",
-            headers={"Content-Disposition": f"attachment; filename=boat-reservations.ics"},
+            headers={"Content-Disposition": f"attachment; filename=reservations.ics"},
         )
 
     @app.route("/ical-token")
@@ -728,7 +755,6 @@ def register_routes(app: Flask):
                 elif user.get("pending_email"):
                     flash("A verification email is already pending. Check your inbox or wait for it to expire.", "warning")
                 else:
-                    # Check not taken by another user
                     taken = db.fetchone(
                         "SELECT id FROM users WHERE (email = %s OR username = %s) AND id != %s",
                         (new_email, new_email, user["id"]),
@@ -785,7 +811,6 @@ def register_routes(app: Flask):
                 elif new_pw2 and new_pw2 != confirm2:
                     flash("Family passwords do not match.", "danger")
                 else:
-                    # Check email2 not already used by another account
                     taken = db.fetchone(
                         "SELECT id FROM users WHERE (LOWER(email)=%s OR LOWER(email2)=%s) AND id!=%s",
                         (email2, email2, user["id"]),
@@ -853,17 +878,23 @@ def register_routes(app: Flask):
             flash("Check-out already recorded for this reservation.", "info")
             return redirect(url_for("my_reservations"))
 
+        vtype = getattr(g, "vehicle_type", "boat")
+        settings = models.get_all_club_settings()
+        ctx = vehicle_types.build_checkout_context(vtype, settings)
+
         if request.method == "POST":
             time_str    = request.form.get("checkout_time", "").strip()
-            hours_str   = request.form.get("motor_hours_out", "").strip()
+            hours_str   = request.form.get("primary_hours_out", "").strip()
             fuel_level  = request.form.get("fuel_level_out", "").strip()
             condition   = request.form.get("condition_out", "").strip()[:500]
             checklist   = [int(x) for x in request.form.getlist("checklist") if x.isdigit()]
             try:
                 checkout_dt = datetime.fromisoformat(f"{res['date'].isoformat()}T{time_str}")
                 hours_out   = float(hours_str) if hours_str else None
+                vehicle_id  = res.get("vehicle_id") or models.get_default_vehicle_id()
                 models.create_checkout(res_id, user["id"], checkout_dt,
-                                       hours_out, fuel_level or None, condition, checklist)
+                                       hours_out, fuel_level or None, condition, checklist,
+                                       vehicle_id=vehicle_id)
                 models.log_action(user["id"], "trip_checkout", "reservation", res_id,
                                   {"fuel_level": fuel_level, "checklist_count": len(checklist)})
                 flash("Check-out recorded. Have a great trip!", "success")
@@ -873,12 +904,7 @@ def register_routes(app: Flask):
 
         now_time = datetime.now(CENTRAL).strftime("%H:%M")
         return render_template("checkout.html", res=res, trip_log=None,
-                               CAPTAIN_CHECKLIST=models.CAPTAIN_CHECKLIST,
-                               CHECKLIST_CATEGORIES=models.CHECKLIST_CATEGORIES,
-                               FUEL_LEVELS=models.FUEL_LEVELS,
-                               DISCLAIMER=models.CAPTAIN_CHECKLIST_DISCLAIMER,
-                               MARINA_PHONE=models.MARINA_PHONE,
-                               now_time=now_time)
+                               now_time=now_time, **ctx)
 
     @app.route("/trips/<int:res_id>/checkin", methods=["GET", "POST"])
     @auth.login_required
@@ -888,7 +914,6 @@ def register_routes(app: Flask):
         res = models.get_reservation_by_id(res_id)
         if not res:
             abort(404)
-        # Auth check first — before trip_log so non-owners always get 403
         if not user["is_admin"] and res["user_id"] != eff_id:
             abort(403)
         trip_log = models.get_trip_log(res_id)
@@ -896,9 +921,13 @@ def register_routes(app: Flask):
             flash("No check-out found for this reservation.", "warning")
             return redirect(url_for("my_reservations"))
 
+        vtype = getattr(g, "vehicle_type", "boat")
+        settings = models.get_all_club_settings()
+        ctx = vehicle_types.build_checkout_context(vtype, settings)
+
         if request.method == "POST":
             time_str      = request.form.get("checkin_time", "").strip()
-            hours_str     = request.form.get("motor_hours_in", "").strip()
+            hours_str     = request.form.get("primary_hours_in", "").strip()
             gallons_str   = request.form.get("fuel_added_gallons", "").strip()
             cost_str      = request.form.get("fuel_added_cost", "").strip()
             condition     = request.form.get("condition_in", "").strip()[:500]
@@ -921,14 +950,15 @@ def register_routes(app: Flask):
 
         now_time = datetime.now(CENTRAL).strftime("%H:%M")
         return render_template("checkin.html", res=res, trip_log=trip_log,
-                               FUEL_LEVELS=models.FUEL_LEVELS,
-                               now_time=now_time)
+                               now_time=now_time, **ctx)
 
     @app.route("/admin/trip-logs")
     @auth.admin_required
     def admin_trip_logs():
         logs = models.get_all_trip_logs()
-        return render_template("admin/trip_logs.html", logs=logs)
+        vtype = getattr(g, "vehicle_type", "boat")
+        return render_template("admin/trip_logs.html", logs=logs,
+                               HOURS_LABEL=vehicle_types.get_hours_label(vtype))
 
     @app.route("/admin/feedback")
     @auth.admin_required
@@ -947,7 +977,6 @@ def register_routes(app: Flask):
             display_name     = request.form.get("display_name", "").strip()
             family_str       = request.form.get("family_account_id", "").strip()
             family_account_id = int(family_str) if family_str.isdigit() else None
-            # Prevent circular family links
             if family_account_id == user_id:
                 family_account_id = None
             models.update_user_profile(user_id, display_name or None, family_account_id)
@@ -957,24 +986,23 @@ def register_routes(app: Flask):
             return redirect(url_for("admin_users"))
         return render_template("admin/edit_user.html", target=target, all_users=all_users)
 
-    # -- Club Rules & Captain's Checklist -------------------------------------
+    # -- Club Rules & Checklist ---------------------------------------------
 
     @app.route("/rules")
     @auth.login_required
     def rules_page():
-        return render_template("rules.html",
-                               CAPTAIN_CHECKLIST=models.CAPTAIN_CHECKLIST,
-                               CHECKLIST_CATEGORIES=models.CHECKLIST_CATEGORIES,
-                               DISCLAIMER=models.CAPTAIN_CHECKLIST_DISCLAIMER)
+        vtype = getattr(g, "vehicle_type", "boat")
+        settings = models.get_all_club_settings()
+        ctx = vehicle_types.build_checkout_context(vtype, settings)
+        return render_template("rules.html", **ctx)
 
     @app.route("/checklist")
     @auth.login_required
     def checklist_page():
-        return render_template("checklist.html",
-                               CAPTAIN_CHECKLIST=models.CAPTAIN_CHECKLIST,
-                               CHECKLIST_CATEGORIES=models.CHECKLIST_CATEGORIES,
-                               MARINA_PHONE=models.MARINA_PHONE,
-                               DISCLAIMER=models.CAPTAIN_CHECKLIST_DISCLAIMER)
+        vtype = getattr(g, "vehicle_type", "boat")
+        settings = models.get_all_club_settings()
+        ctx = vehicle_types.build_checkout_context(vtype, settings)
+        return render_template("checklist.html", **ctx)
 
     # -- Monthly Statements ---------------------------------------------------
 
@@ -1023,7 +1051,6 @@ def register_routes(app: Flask):
                 if len(data) > 20 * 1024 * 1024:
                     flash("File too large — maximum is 20 MB.", "danger")
                 else:
-                    import os
                     filename = os.path.basename(f.filename)
                     stmt_id = models.create_statement(display_name, filename, data,
                                                       auth.current_user()["id"])
@@ -1051,7 +1078,6 @@ def register_routes(app: Flask):
             if user and user.get("email"):
                 token = models.create_password_token(user["id"])
                 email_notify.notify_password_reset(user, token)
-            # Always show the same message to prevent account enumeration
             flash("If that account exists and has an email address, a reset link has been sent.", "info")
             return redirect(url_for("forgot_password"))
         return render_template("forgot_password.html")
@@ -1078,7 +1104,6 @@ def register_routes(app: Flask):
             flash("Password set — please log in.", "success")
             return redirect(url_for("login"))
 
-        # GET: verify token is still valid before showing the form
         user = models.get_user_by_password_token(token)
         if not user:
             flash("That link is invalid or has expired. Request a new one.", "danger")
@@ -1090,7 +1115,6 @@ def register_routes(app: Flask):
     @app.route("/feedback", methods=["POST"])
     @auth.login_required
     def submit_feedback():
-        # Lazy import so a missing anthropic package doesn't crash startup
         import feedback as fb
 
         user = auth.current_user()
@@ -1124,6 +1148,90 @@ def register_routes(app: Flask):
         models.log_action(user["id"], "feedback_submitted", None, None,
                           {"action": action, "length": len(text)})
         return jsonify({"ok": True, "action": action})
+
+
+# ---------------------------------------------------------------------------
+# Super-admin routes
+# ---------------------------------------------------------------------------
+
+def register_superadmin_routes(app: Flask):
+
+    @app.route("/superadmin/login", methods=["GET", "POST"])
+    def superadmin_login():
+        if auth.current_super_admin():
+            return redirect(url_for("superadmin_dashboard"))
+
+        if request.method == "POST":
+            username = request.form.get("username", "").strip()
+            password = request.form.get("password", "")
+            admin = auth.authenticate_super_admin(username, password)
+            if admin:
+                auth.login_super_admin(admin)
+                return redirect(url_for("superadmin_dashboard"))
+            flash("Invalid super-admin credentials.", "danger")
+
+        return render_template("superadmin/login.html")
+
+    @app.route("/superadmin/logout")
+    def superadmin_logout():
+        auth.logout_super_admin()
+        return redirect(url_for("superadmin_login"))
+
+    @app.route("/superadmin/")
+    @auth.superadmin_required
+    def superadmin_dashboard():
+        import master_db as mdb
+        clubs = mdb.get_all_clubs()
+        return render_template("superadmin/dashboard.html", clubs=clubs)
+
+    @app.route("/superadmin/clubs/new", methods=["GET", "POST"])
+    @auth.superadmin_required
+    def superadmin_new_club():
+        if request.method == "POST":
+            name         = request.form.get("name", "").strip()
+            short_name   = request.form.get("short_name", "").strip().lower()
+            vtype        = request.form.get("vehicle_type", "boat")
+            contact_email = request.form.get("contact_email", "").strip()
+            timezone     = request.form.get("timezone", "America/Chicago").strip()
+
+            if not name or not short_name:
+                flash("Club name and short name are required.", "danger")
+            elif vtype not in ("boat", "plane"):
+                flash("Vehicle type must be 'boat' or 'plane'.", "danger")
+            else:
+                try:
+                    import master_models
+                    result = master_models.provision_club(
+                        name, short_name, vtype, contact_email, timezone)
+                    import master_db as mdb
+                    mdb.log_master_action(
+                        auth.current_super_admin()["id"],
+                        "club_provisioned", "club",
+                        result.get("id"),
+                        {"short_name": short_name, "vehicle_type": vtype},
+                    )
+                    flash(
+                        f"Club '{name}' provisioned. DB user password: {result.get('_db_password', '(see logs)')}",
+                        "success",
+                    )
+                    return redirect(url_for("superadmin_dashboard"))
+                except Exception as exc:
+                    flash(f"Provisioning failed: {exc}", "danger")
+
+        return render_template("superadmin/new_club.html")
+
+    @app.route("/superadmin/clubs/<int:club_id>/deactivate", methods=["POST"])
+    @auth.superadmin_required
+    def superadmin_deactivate_club(club_id: int):
+        import master_db as mdb
+        mdb.deactivate_club(club_id)
+        mdb.log_master_action(
+            auth.current_super_admin()["id"],
+            "club_deactivated", "club", club_id,
+        )
+        club_resolver.invalidate_cache()
+        flash("Club deactivated.", "success")
+        return redirect(url_for("superadmin_dashboard"))
 
 
 # ---------------------------------------------------------------------------

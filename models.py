@@ -1,6 +1,6 @@
 """
-Database query functions for Bentley Boat Club.
-All business logic lives here.
+Database query functions for ClubReserve.
+All business logic lives here. Vehicle-type constants moved to vehicle_types.py.
 """
 
 from datetime import date, datetime, timedelta
@@ -173,12 +173,12 @@ def get_reservations_range(start: date, end: date) -> list:
 
 
 def get_reservations_for_date(res_date: date) -> list:
-    """Return all active reservations for a specific day, ordered by start time."""
+    """Return all active/pending reservations for a specific day, ordered by start time."""
     return db.execute(
-        "SELECT r.id, r.start_time, r.end_time, r.user_id, r.notes, u.full_name, u.username "
+        "SELECT r.id, r.start_time, r.end_time, r.user_id, r.status, r.notes, u.full_name, u.username "
         "FROM reservations r "
         "JOIN users u ON u.id = r.user_id "
-        "WHERE r.date = %s AND r.status = 'active' "
+        "WHERE r.date = %s AND r.status IN ('active', 'pending_approval') "
         "ORDER BY r.start_time",
         (res_date,),
     )
@@ -252,7 +252,8 @@ def _has_consecutive_violation(dates: set, max_run: int = 3) -> bool:
     return False
 
 
-def validate_reservation(user_id: int, start_dt: datetime, end_dt: datetime) -> str | None:
+def validate_reservation(user_id: int, start_dt: datetime, end_dt: datetime,
+                          vehicle_id: int = None, vehicle_noun: str = "vehicle") -> str | None:
     """
     Check all business rules for a new reservation.
     Returns an error string on failure, or None if valid.
@@ -261,8 +262,8 @@ def validate_reservation(user_id: int, start_dt: datetime, end_dt: datetime) -> 
       1. Minimum 2 hours, maximum 6 hours duration
       2. Start must be in the future
       3. Start and end must be on the same calendar day
-      4. No overlap with any existing active reservation
-      5. No overlap with a blackout date
+      4. No overlap with any existing active reservation for this vehicle
+      5. No overlap with a blackout date for this vehicle (or club-wide)
       6. User must have fewer pending reservations than their per-member limit
       7. Adding this date must not create a run exceeding the per-member consecutive-day limit
     """
@@ -292,23 +293,40 @@ def validate_reservation(user_id: int, start_dt: datetime, end_dt: datetime) -> 
     if start_dt.date() != end_dt.date():
         return "Reservations must start and end on the same calendar day."
 
-    # Overlap check: any active reservation whose window intersects ours
-    overlap = db.fetchone(
-        "SELECT r.id, COALESCE(u.display_name, u.full_name) AS display_name FROM reservations r "
-        "JOIN users u ON u.id = r.user_id "
-        "WHERE r.status IN ('active','pending_approval') AND r.start_time < %s AND r.end_time > %s",
-        (end_dt, start_dt),
-    )
+    # Overlap check: scoped to this vehicle if vehicle_id provided
+    if vehicle_id:
+        overlap = db.fetchone(
+            "SELECT r.id, COALESCE(u.display_name, u.full_name) AS display_name FROM reservations r "
+            "JOIN users u ON u.id = r.user_id "
+            "WHERE r.vehicle_id = %s AND r.status IN ('active','pending_approval') "
+            "AND r.start_time < %s AND r.end_time > %s",
+            (vehicle_id, end_dt, start_dt),
+        )
+    else:
+        overlap = db.fetchone(
+            "SELECT r.id, COALESCE(u.display_name, u.full_name) AS display_name FROM reservations r "
+            "JOIN users u ON u.id = r.user_id "
+            "WHERE r.status IN ('active','pending_approval') AND r.start_time < %s AND r.end_time > %s",
+            (end_dt, start_dt),
+        )
     if overlap:
         return f"That time overlaps with {overlap['display_name']}'s reservation."
 
-    # Blackout check
-    blackout = db.fetchone(
-        "SELECT id, reason FROM blackout_dates WHERE start_time < %s AND end_time > %s",
-        (end_dt, start_dt),
-    )
+    # Blackout check — vehicle-specific OR club-wide (vehicle_id IS NULL)
+    if vehicle_id:
+        blackout = db.fetchone(
+            "SELECT id, reason FROM blackout_dates "
+            "WHERE (vehicle_id = %s OR vehicle_id IS NULL) "
+            "AND start_time < %s AND end_time > %s",
+            (vehicle_id, end_dt, start_dt),
+        )
+    else:
+        blackout = db.fetchone(
+            "SELECT id, reason FROM blackout_dates WHERE start_time < %s AND end_time > %s",
+            (end_dt, start_dt),
+        )
     if blackout:
-        return f"The boat is unavailable during that time: {blackout['reason']}."
+        return f"The {vehicle_noun} is unavailable during that time: {blackout['reason']}."
 
     limits = get_user_limits(user_id)
 
@@ -326,15 +344,58 @@ def validate_reservation(user_id: int, start_dt: datetime, end_dt: datetime) -> 
     return None
 
 
+def is_day_fully_booked(reservations: list, min_gap_minutes: int = 120) -> bool:
+    """
+    Return True only if there is no contiguous gap of at least min_gap_minutes
+    anywhere within a 24-hour window on the reservation day.
+    """
+    if not reservations:
+        return False
+    # Use the reservation date to build midnight boundaries
+    day_start = reservations[0]["start_time"].replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end   = day_start.replace(hour=23, minute=59, second=59)
+    sorted_res = sorted(reservations, key=lambda r: r["start_time"])
+    cursor = day_start
+    for res in sorted_res:
+        gap = (res["start_time"] - cursor).total_seconds() / 60
+        if gap >= min_gap_minutes:
+            return False
+        cursor = max(cursor, res["end_time"])
+    return (day_end - cursor).total_seconds() / 60 < min_gap_minutes
+
+
 def make_reservation(user_id: int, start_dt: datetime, end_dt: datetime,
-                     notes: str | None = None, status: str = 'active'):
-    """Insert a new reservation. Call validate_reservation first."""
+                     notes: str | None = None, status: str = 'active',
+                     vehicle_id: int = None):
+    """Insert a new reservation atomically, re-checking for overlap inside the transaction."""
     notes = (notes or "").strip() or None
-    return db.insert(
-        "INSERT INTO reservations (user_id, date, start_time, end_time, notes, status) "
-        "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-        (user_id, start_dt.date(), start_dt, end_dt, notes, status),
-    )
+    with db.get_db() as conn:
+        with conn.cursor() as cur:
+            # Lock to prevent concurrent overlapping inserts (TOCTOU race condition)
+            cur.execute("LOCK TABLE reservations IN SHARE ROW EXCLUSIVE MODE")
+            # Re-check overlap inside the same transaction
+            if vehicle_id:
+                cur.execute(
+                    "SELECT id FROM reservations "
+                    "WHERE vehicle_id = %s AND status IN ('active','pending_approval') "
+                    "AND start_time < %s AND end_time > %s",
+                    (vehicle_id, end_dt, start_dt),
+                )
+            else:
+                cur.execute(
+                    "SELECT id FROM reservations "
+                    "WHERE status IN ('active','pending_approval') "
+                    "AND start_time < %s AND end_time > %s",
+                    (end_dt, start_dt),
+                )
+            if cur.fetchone():
+                return None  # Overlap detected under lock — caller should treat as error
+            cur.execute(
+                "INSERT INTO reservations (user_id, vehicle_id, date, start_time, end_time, notes, status) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                (user_id, vehicle_id, start_dt.date(), start_dt, end_dt, notes, status),
+            )
+            return cur.fetchone()
 
 
 def cancel_reservation(res_id: int, user_id: int, is_admin: bool = False) -> bool:
@@ -733,42 +794,53 @@ def get_user_ical_reservations(user_id: int) -> list:
 # Trip logs
 # ---------------------------------------------------------------------------
 
-CAPTAIN_CHECKLIST_DISCLAIMER = (
-    "Boating involves risks. The Captain and passengers accept all responsibility for any damage, "
-    "injury, death, or claims from using this boat, and agree to indemnify and hold the Owner "
-    "and other Boat Club Members harmless. Owner and Members shall not be liable for any physical, "
-    "financial or any other damages."
-)
+# Checklist constants, fuel levels, and contact info have moved to vehicle_types.py.
+# Use vehicle_types.build_checkout_context(vehicle_type, settings) in routes.
 
-MARINA_PHONE = "830-255-7442"
 
-CAPTAIN_CHECKLIST = [
-    # Pre-Launch (indices 0-3)
-    "Unplug shore power (back left of boat), secure both cords. Turn electrical power ON — RED Perko switch to DOWN position.",
-    "Verify life vests in left side seat compartments. Fire extinguisher, first aid kit and emergency equipment under Captain's seat.",
-    "Connect & turn on Garmin depth finder, verify approx. 16 ft depth at slip. Monitor depth finder at all times to avoid prop strike.",
-    "Visually verify prop is in good condition. Trim motor all the way down before starting. Plug in dash safety kill switch clip.",
-    # Starting & Departure (indices 4-6)
-    "STARTING: Throttle in neutral. After starting, visually verify cooling water stream exiting on the left side of outboard motor.",
-    "Verify fuel gauge near full, passengers secure, then disconnect tiedowns at cleats on the boat (ropes stay tied to dock).",
-    "Operate at best idle speed (~900 RPM) in all no-wake zones.",
-    # Return & Shutdown (index 7)
-    "RETURN: Gas up upon return. Get dockhand assistance. Return to slip. Secure boat — follow ALL launch procedures in reverse order. Turn Perko switch OFF (up position), connect shore power. Clean and check belongings.",
-]
+# ---------------------------------------------------------------------------
+# Vehicles
+# ---------------------------------------------------------------------------
 
-CHECKLIST_CATEGORIES = [
-    ("Pre-Launch",           list(range(0, 4))),
-    ("Starting & Departure", list(range(4, 7))),
-    ("Return & Shutdown",    list(range(7, 8))),
-]
+def get_all_vehicles() -> list:
+    return db.execute(
+        "SELECT * FROM vehicles WHERE is_active = TRUE ORDER BY name"
+    )
 
-FUEL_LEVELS = {
-    "empty":          ("Empty",    "danger"),
-    "quarter":        ("¼",        "warning"),
-    "half":           ("½",        "warning"),
-    "three_quarters": ("¾",        "success"),
-    "full":           ("Full",     "success"),
-}
+
+def get_vehicle_by_id(vehicle_id: int):
+    return db.fetchone("SELECT * FROM vehicles WHERE id = %s", (vehicle_id,))
+
+
+def get_default_vehicle_id() -> int | None:
+    """Return the id of the first active vehicle (used when vehicle_id not specified)."""
+    row = db.fetchone(
+        "SELECT id FROM vehicles WHERE is_active = TRUE ORDER BY id LIMIT 1"
+    )
+    return row["id"] if row else None
+
+
+# ---------------------------------------------------------------------------
+# Club settings
+# ---------------------------------------------------------------------------
+
+def get_club_setting(key: str, default: str = None) -> str | None:
+    row = db.fetchone("SELECT value FROM club_settings WHERE key = %s", (key,))
+    return row["value"] if row else default
+
+
+def update_club_setting(key: str, value: str):
+    db.execute(
+        "INSERT INTO club_settings (key, value) VALUES (%s, %s) "
+        "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()",
+        (key, value), fetch=False,
+    )
+
+
+def get_all_club_settings() -> dict:
+    """Return all club_settings as a plain dict."""
+    rows = db.execute("SELECT key, value FROM club_settings")
+    return {row["key"]: row["value"] for row in rows} if rows else {}
 
 
 def get_trip_log(res_id: int):
@@ -776,26 +848,27 @@ def get_trip_log(res_id: int):
 
 
 def create_checkout(res_id: int, user_id: int, checkout_time,
-                    motor_hours_out, fuel_level_out: str,
-                    condition_out: str, checklist_items: list):
+                    primary_hours_out, fuel_level_out: str,
+                    condition_out: str, checklist_items: list,
+                    vehicle_id: int = None):
     import json
     return db.insert(
         "INSERT INTO trip_logs "
-        "(res_id, user_id, checkout_time, motor_hours_out, fuel_level_out, "
+        "(res_id, vehicle_id, user_id, checkout_time, primary_hours_out, fuel_level_out, "
         " condition_out, checklist_items) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
-        (res_id, user_id, checkout_time, motor_hours_out, fuel_level_out,
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (res_id, vehicle_id, user_id, checkout_time, primary_hours_out, fuel_level_out,
          condition_out or None, json.dumps(checklist_items)),
     )
 
 
-def update_checkin(res_id: int, checkin_time, motor_hours_in,
+def update_checkin(res_id: int, checkin_time, primary_hours_in,
                    fuel_added_gallons, fuel_added_cost, condition_in: str):
     db.execute(
-        "UPDATE trip_logs SET checkin_time=%s, motor_hours_in=%s, "
+        "UPDATE trip_logs SET checkin_time=%s, primary_hours_in=%s, "
         "fuel_added_gallons=%s, fuel_added_cost=%s, condition_in=%s "
         "WHERE res_id=%s",
-        (checkin_time, motor_hours_in, fuel_added_gallons or None,
+        (checkin_time, primary_hours_in, fuel_added_gallons or None,
          fuel_added_cost or None, condition_in or None, res_id),
         fetch=False,
     )
