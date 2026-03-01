@@ -230,12 +230,25 @@ def register_routes(app: Flask):
         existing = models.get_reservations_for_date(day)
 
         def _render(extra=None):
+            import json as _json
+            from collections import defaultdict
             user_res_ids = {r["user_id"] for r in existing}
             # A day is only "fully booked" when every vehicle has no 2-hr gap remaining
             fully_booked = all(
                 models.is_day_fully_booked([r for r in existing if r.get("vehicle_id") == v["id"]])
                 for v in vehicles
             ) if vehicles else False
+            # Build booked-time windows per vehicle for JS time-slot filtering (#7)
+            _bw: dict = defaultdict(list)
+            for r in existing:
+                vid = r.get("vehicle_id")
+                st  = r.get("start_time")
+                et  = r.get("end_time")
+                if vid and st and et:
+                    _bw[vid].append({
+                        "s": st.hour * 60 + st.minute,
+                        "e": et.hour * 60 + et.minute,
+                    })
             kw = dict(
                 day=day, existing=existing, today=date.today(),
                 vehicles=vehicles,
@@ -244,6 +257,7 @@ def register_routes(app: Flask):
                 day_is_fully_booked=fully_booked,
                 vehicle_photo=models.get_primary_vehicle_photo(),
                 res_settings=settings,
+                booked_windows_json=_json.dumps(dict(_bw)),
             )
             if extra:
                 kw.update(extra)
@@ -1287,24 +1301,24 @@ def register_routes(app: Flask):
     @app.route("/club-logo")
     def club_logo():
         """Serve the club logo image."""
-        branding = models.get_branding()
-        if not branding.get("logo_data"):
+        row = models.get_branding_logo()
+        if not row:
             return app.send_static_file("images/badge.svg")
         return Response(
-            bytes(branding["logo_data"]),
-            content_type=branding["logo_content_type"] or "image/png",
+            bytes(row["logo_data"]),
+            content_type=row["logo_content_type"] or "image/png",
             headers={"Cache-Control": "public, max-age=3600"},
         )
 
     @app.route("/club-hero")
     def club_hero():
         """Serve the club hero/banner image."""
-        branding = models.get_branding()
-        if not branding.get("hero_data"):
+        row = models.get_branding_hero()
+        if not row:
             abort(404)
         return Response(
-            bytes(branding["hero_data"]),
-            content_type=branding["hero_content_type"] or "image/jpeg",
+            bytes(row["hero_data"]),
+            content_type=row["hero_content_type"] or "image/jpeg",
             headers={"Cache-Control": "public, max-age=3600"},
         )
 

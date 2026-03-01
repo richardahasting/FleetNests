@@ -1098,13 +1098,38 @@ def get_all_feedback_submissions() -> list:
 # ---------------------------------------------------------------------------
 
 def get_branding() -> dict:
-    """Return the single club_branding row (colors, logo, hero)."""
-    row = db.fetchone("SELECT * FROM club_branding LIMIT 1")
+    """Return club branding metadata (colors + existence flags, no binary data).
+    Used by the context processor on every request — intentionally omits BYTEA
+    columns to avoid fetching 100 KB+ of image data per request.
+    Use get_branding_logo() / get_branding_hero() to retrieve actual image bytes.
+    """
+    row = db.fetchone(
+        "SELECT primary_color, accent_color, logo_content_type, hero_content_type,"
+        "       (logo_data IS NOT NULL) AS has_logo,"
+        "       (hero_data IS NOT NULL) AS has_hero"
+        " FROM club_branding LIMIT 1"
+    )
     if not row:
         return {"primary_color": "#0A2342", "accent_color": "#C9A84C",
-                "logo_data": None, "logo_content_type": None,
-                "hero_data": None, "hero_content_type": None}
+                "logo_content_type": None, "hero_content_type": None,
+                "has_logo": False, "has_hero": False}
     return dict(row)
+
+
+def get_branding_logo() -> dict | None:
+    """Return logo binary data row, or None if no logo is stored."""
+    return db.fetchone(
+        "SELECT logo_data, logo_content_type FROM club_branding"
+        " WHERE logo_data IS NOT NULL LIMIT 1"
+    )
+
+
+def get_branding_hero() -> dict | None:
+    """Return hero binary data row, or None if no hero is stored."""
+    return db.fetchone(
+        "SELECT hero_data, hero_content_type FROM club_branding"
+        " WHERE hero_data IS NOT NULL LIMIT 1"
+    )
 
 
 def update_branding_colors(primary_color: str, accent_color: str):

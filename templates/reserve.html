@@ -269,8 +269,16 @@
   const notesEl    = document.getElementById('notes');
   const countEl    = document.getElementById('notesCount');
   const checkboxes = Array.from(document.querySelectorAll('.vehicle-checkbox'));
-  // If there's a hidden single-vehicle input instead of checkboxes, treat as always-selected
   const singleMode = checkboxes.length === 0;
+
+  // Booked windows per vehicle: {vehicleId: [{s: startMins, e: endMins}, ...]}
+  // Used to grey out already-taken time slots when a vehicle is selected (#7)
+  const BOOKED = {{ booked_windows_json | safe }};
+
+  // For single-vehicle mode, get the vehicle id from the hidden input
+  const singleVehicleId = singleMode
+    ? (document.querySelector('input[name="vehicle_id"]') || {}).value
+    : null;
 
   if (notesEl && countEl) {
     notesEl.addEventListener('input', () => { countEl.textContent = notesEl.value.length; });
@@ -289,15 +297,34 @@
     };
   }
 
-  function makeOpt(value, label) {
+  function makeOpt(value, label, disabled) {
     const o = document.createElement('option');
     o.value = value;
     o.textContent = label;
+    if (disabled) { o.disabled = true; o.style.color = '#aaa'; }
     return o;
   }
 
-  function selectedVehicles() {
-    return singleMode ? ['1'] : checkboxes.filter(c => c.checked);
+  // Return merged list of booked windows for the currently selected vehicle(s)
+  function getSelectedWindows() {
+    const ids = singleMode
+      ? (singleVehicleId ? [singleVehicleId] : [])
+      : checkboxes.filter(c => c.checked).map(c => c.value);
+    const windows = [];
+    ids.forEach(id => { (BOOKED[id] || []).forEach(w => windows.push(w)); });
+    return windows;
+  }
+
+  // Is a given start-of-slot (in minutes) inside any booked window?
+  function isStartBlocked(t, windows) {
+    return windows.some(w => t >= w.s && t < w.e);
+  }
+
+  // Earliest booked-window start strictly after `startMins`, or Infinity
+  function nextBookedStart(startMins, windows) {
+    let min = Infinity;
+    windows.forEach(w => { if (w.s > startMins) min = Math.min(min, w.s); });
+    return min;
   }
 
   const endDateRow = document.getElementById('endDateRow');
@@ -311,7 +338,6 @@
     if (!hasTime) return;
     const [sh, sm] = startEl.value.split(':').map(Number);
     const [eh, em] = endEl.value.split(':').map(Number);
-    // Calculate duration accounting for end-date offset
     let extraDays = 0;
     if (endDateEl && endDateEl.value) {
       const startDate = new Date('{{ day.isoformat() }}');
@@ -344,6 +370,27 @@
   {% set _max_h = res_settings.get('max_res_hours', '') %}
   const multiDay = {{ 'true' if (not _max_h or _max_h|float > 24) else 'false' }};
 
+  // Rebuild start-time dropdown, greying out slots already booked for selected vehicle(s)
+  function populateStartTimes() {
+    const prevVal = startEl.value;
+    while (startEl.firstChild) startEl.removeChild(startEl.firstChild);
+    startEl.appendChild(makeOpt('', '— select —'));
+    const windows = getSelectedWindows();
+    for (let t = 0; t < 1440; t += 30) {
+      const f = fmt12(t);
+      const blocked = isStartBlocked(t, windows);
+      const label = blocked ? f.label + ' (unavailable)' : f.label;
+      startEl.appendChild(makeOpt(f.value, label, blocked));
+    }
+    // Restore previous selection if still valid
+    if (prevVal && !isStartBlocked(
+        Number(prevVal.split(':')[0]) * 60 + Number(prevVal.split(':')[1]), windows)) {
+      startEl.value = prevVal;
+    } else {
+      startEl.value = '';
+    }
+  }
+
   function populateEndTimes() {
     while (endEl.firstChild) endEl.removeChild(endEl.firstChild);
     endEl.disabled = true;
@@ -358,22 +405,29 @@
 
     const [sh, sm] = startEl.value.split(':').map(Number);
     const startMins = sh * 60 + sm;
-    const minAdd  = minHours > 0 ? Math.ceil(minHours * 60) : 30;
-    // Max end-of-day slot capped at 23:30 (1410 mins)
-    const dayEnd  = 1410;
-    // If maxHours set and fits within a day, cap end times; else offer full day + show end-date
+    const minAdd    = minHours > 0 ? Math.ceil(minHours * 60) : 30;
+    const dayEnd    = 1410;
     const withinDay = maxHours > 0 && (startMins + maxHours * 60) <= 1440;
-    const maxAdd  = withinDay ? maxHours * 60 : (dayEnd - startMins);
+    const maxAdd    = withinDay ? maxHours * 60 : (dayEnd - startMins);
+
+    // Cap end times at next booked window start for selected vehicles
+    const windows    = getSelectedWindows();
+    const nextBooked = nextBookedStart(startMins, windows);
+    const endCap     = Math.min(startMins + maxAdd, nextBooked);
 
     endEl.appendChild(makeOpt('', '— select —'));
-    for (let t = startMins + minAdd; t <= startMins + maxAdd && t <= 1440; t += 30) {
+    for (let t = startMins + minAdd; t <= endCap && t <= 1440; t += 30) {
       const f = fmt12(t % 1440);
       endEl.appendChild(makeOpt(f.value, f.label));
     }
     endEl.disabled = endEl.options.length <= 1;
 
-    // Show end-date picker for multi-day clubs
-    if (endDateRow && multiDay && !withinDay) {
+    if (endEl.disabled) {
+      hint.className = 'form-text text-warning';
+      hint.textContent = 'No available end times — this vehicle is booked immediately after your start time.';
+    }
+
+    if (endDateRow && multiDay && !withinDay && endCap > startMins + maxAdd - 1) {
       endDateRow.style.display = '';
     }
     updateSubmit();
@@ -383,19 +437,23 @@
     endDateEl.addEventListener('change', updateSubmit);
   }
 
-  // Highlight selected vehicle cards
+  // Highlight selected vehicle cards and refresh time pickers
   checkboxes.forEach(cb => {
     cb.addEventListener('change', function () {
       this.closest('label').classList.toggle('vehicle-select-card--selected', this.checked);
+      populateStartTimes();
+      populateEndTimes();
       updateSubmit();
     });
   });
 
-  // If single-mode, enable button as soon as times are set
   if (singleMode) btn.disabled = true;
 
   startEl.addEventListener('change', populateEndTimes);
   endEl.addEventListener('change', updateSubmit);
+
+  // Initial start-time population (reflects any pre-existing selections)
+  populateStartTimes();
 })();
 </script>
 

@@ -269,7 +269,7 @@
               </div>
               <div class="form-text">PNG, SVG, or WebP recommended · max 5 MB</div>
             </form>
-            {% if branding.logo_data %}
+            {% if branding.has_logo %}
             <form method="POST" action="{{ url_for('admin_branding') }}" class="mt-2">
               <input type="hidden" name="action" value="delete_logo">
               <button type="submit" class="btn btn-outline-danger btn-sm">
@@ -284,7 +284,7 @@
 
         {# Hero image #}
         <h6 class="text-uppercase text-muted mb-3">Hero Banner Image</h6>
-        {% if branding.hero_data %}
+        {% if branding.has_hero %}
         <div class="mb-3 rounded overflow-hidden shadow-sm" style="max-height:160px;">
           <img src="{{ url_for('club_hero') }}" alt="Hero image"
                style="width:100%;height:160px;object-fit:cover;">
@@ -299,7 +299,7 @@
           </div>
           <div class="form-text">Shown as banner on the calendar page · Landscape, min 1200px wide recommended · max 5 MB</div>
         </form>
-        {% if branding.hero_data %}
+        {% if branding.has_hero %}
         <form method="POST" action="{{ url_for('admin_branding') }}">
           <input type="hidden" name="action" value="delete_hero">
           <button type="submit" class="btn btn-outline-danger btn-sm">

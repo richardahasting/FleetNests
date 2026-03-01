@@ -8,10 +8,10 @@
 {% block content %}
 {# Hero banner — shows club hero image or a gradient fallback #}
 <div class="club-hero mb-3 rounded-3 overflow-hidden shadow-sm">
-  {% if branding.hero_data %}
+  {% if branding.has_hero %}
   <img src="{{ url_for('club_hero') }}" alt="{{ club.name if club else 'FleetNests' }}">
   {% endif %}
-  <div class="{{ 'club-hero-overlay' if branding.hero_data else 'club-hero-gradient' }}">
+  <div class="{{ 'club-hero-overlay' if branding.has_hero else 'club-hero-gradient' }}">
     <h2 class="club-hero-title">{{ club.name if club else 'FleetNests' }}</h2>
   </div>
 </div>
