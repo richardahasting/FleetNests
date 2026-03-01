@@ -12,7 +12,11 @@
   <img src="{{ url_for('club_hero') }}" alt="{{ club.name if club else 'FleetNests' }}">
   {% endif %}
   <div class="{{ 'club-hero-overlay' if branding.has_hero else 'club-hero-gradient' }}">
-    <h2 class="club-hero-title">{{ club.name if club else 'FleetNests' }}</h2>
+    <div class="club-hero-brand">
+      <img src="{{ url_for('club_logo') }}" alt="{{ club.name if club else 'FleetNests' }} logo"
+           class="club-hero-logo">
+      <h2 class="club-hero-title">{{ club.name if club else 'FleetNests' }}</h2>
+    </div>
   </div>
 </div>
 
