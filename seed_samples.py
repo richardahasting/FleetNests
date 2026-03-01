@@ -524,7 +524,7 @@ VEHICLE_PHOTOS = {
 
 LOGO_PATHS = {
     "sample1": os.path.expanduser("~/SummitRidgeFlyingClubLogo.jpeg"),
-    "sample2": os.path.expanduser("~/BentleyBoatClubLogo.jpeg"),
+    "sample2": os.path.expanduser("~/ClearWaterBoatClubLogo.jpeg"),
 }
 
 HERO_PATHS = {
