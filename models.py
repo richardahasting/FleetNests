@@ -1261,3 +1261,140 @@ def set_primary_vehicle_photo(photo_id: int):
 
 def delete_vehicle_photo(photo_id: int):
     db.execute("DELETE FROM vehicle_photos WHERE id = %s", (photo_id,), fetch=False)
+
+
+# ---------------------------------------------------------------------------
+# Maintenance records
+# ---------------------------------------------------------------------------
+
+def get_maintenance_records(vehicle_id: int = None) -> list:
+    """All maintenance records, optionally filtered by vehicle."""
+    if vehicle_id:
+        return db.execute(
+            "SELECT mr.*, v.name AS vehicle_name "
+            "FROM maintenance_records mr "
+            "JOIN vehicles v ON v.id = mr.vehicle_id "
+            "WHERE mr.vehicle_id = %s "
+            "ORDER BY mr.performed_at DESC, mr.created_at DESC",
+            (vehicle_id,),
+        )
+    return db.execute(
+        "SELECT mr.*, v.name AS vehicle_name "
+        "FROM maintenance_records mr "
+        "JOIN vehicles v ON v.id = mr.vehicle_id "
+        "ORDER BY mr.performed_at DESC, mr.created_at DESC"
+    )
+
+
+def create_maintenance_record(vehicle_id: int, performed_by: str | None,
+                              performed_at, category: str, description: str,
+                              hours_at_service=None, cost=None, notes: str | None = None,
+                              created_by: int | None = None) -> int:
+    row = db.insert(
+        "INSERT INTO maintenance_records "
+        "(vehicle_id, performed_by, performed_at, category, description, "
+        " hours_at_service, cost, notes, created_by) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (vehicle_id, performed_by or None, performed_at, category, description,
+         hours_at_service, cost, notes or None, created_by),
+    )
+    return row["id"]
+
+
+def delete_maintenance_record(record_id: int):
+    db.execute("DELETE FROM maintenance_records WHERE id = %s", (record_id,), fetch=False)
+
+
+# ---------------------------------------------------------------------------
+# Maintenance schedules
+# ---------------------------------------------------------------------------
+
+def get_maintenance_schedules(vehicle_id: int = None, active_only: bool = True) -> list:
+    """All maintenance schedules with vehicle name."""
+    where = "WHERE ms.is_active = TRUE" if active_only else "WHERE TRUE"
+    args = ()
+    if vehicle_id:
+        where += " AND ms.vehicle_id = %s"
+        args = (vehicle_id,)
+    return db.execute(
+        f"SELECT ms.*, v.name AS vehicle_name "
+        f"FROM maintenance_schedules ms "
+        f"JOIN vehicles v ON v.id = ms.vehicle_id "
+        f"{where} "
+        f"ORDER BY ms.priority DESC, ms.next_due_date ASC NULLS LAST, v.name",
+        args or None,
+    )
+
+
+def create_maintenance_schedule(vehicle_id: int, task_name: str, category: str,
+                                description: str | None, interval_months: int | None,
+                                interval_hours=None, last_performed_at=None,
+                                last_performed_hours=None, next_due_date=None,
+                                next_due_hours=None, priority: str = "normal") -> int:
+    row = db.insert(
+        "INSERT INTO maintenance_schedules "
+        "(vehicle_id, task_name, category, description, interval_months, interval_hours, "
+        " last_performed_at, last_performed_hours, next_due_date, next_due_hours, priority) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (vehicle_id, task_name, category, description or None,
+         interval_months, interval_hours, last_performed_at, last_performed_hours,
+         next_due_date, next_due_hours, priority),
+    )
+    return row["id"]
+
+
+def mark_schedule_done(schedule_id: int, done_date, done_hours=None):
+    """Mark a scheduled task as completed; advance next_due_date / next_due_hours."""
+    sched = db.fetchone(
+        "SELECT * FROM maintenance_schedules WHERE id = %s", (schedule_id,)
+    )
+    if not sched:
+        return
+    from datetime import date as _date
+    from dateutil.relativedelta import relativedelta
+
+    next_date = None
+    next_hours = None
+
+    if sched["interval_months"] and done_date:
+        try:
+            base = done_date if isinstance(done_date, _date) else _date.fromisoformat(str(done_date))
+            next_date = base + relativedelta(months=int(sched["interval_months"]))
+        except Exception:
+            pass
+
+    if sched["interval_hours"] and done_hours is not None:
+        try:
+            next_hours = float(done_hours) + float(sched["interval_hours"])
+        except Exception:
+            pass
+
+    db.execute(
+        "UPDATE maintenance_schedules "
+        "SET last_performed_at=%s, last_performed_hours=%s, "
+        "    next_due_date=%s, next_due_hours=%s "
+        "WHERE id=%s",
+        (done_date, done_hours, next_date, next_hours, schedule_id),
+        fetch=False,
+    )
+
+
+def delete_maintenance_schedule(schedule_id: int):
+    db.execute("DELETE FROM maintenance_schedules WHERE id = %s", (schedule_id,), fetch=False)
+
+
+def get_overdue_schedules() -> list:
+    """Schedules whose next_due_date is today or earlier, or next_due_hours <= vehicle current_hours."""
+    today = now_ct().date()
+    return db.execute(
+        "SELECT ms.*, v.name AS vehicle_name, v.current_hours "
+        "FROM maintenance_schedules ms "
+        "JOIN vehicles v ON v.id = ms.vehicle_id "
+        "WHERE ms.is_active = TRUE "
+        "  AND (ms.next_due_date <= %s "
+        "       OR (ms.next_due_hours IS NOT NULL "
+        "           AND v.current_hours IS NOT NULL "
+        "           AND v.current_hours >= ms.next_due_hours)) "
+        "ORDER BY ms.priority DESC, ms.next_due_date ASC NULLS LAST",
+        (today,),
+    )

@@ -11,18 +11,24 @@ subdomain routing, and configurable vehicle type (boat or plane).
 - **Reservation calendar** — FullCalendar UI with overlap enforcement, blackout dates, and pending-approval workflow
 - **Vehicle types** — Boat mode (fuel level buttons, NWS marine weather, Motor Hours) and Plane mode (FAA METAR weather, Hobbs Hours, fuel quantity required on return)
 - **Trip check-out / check-in** — Pre-departure captain's checklist, departure/return time, engine hours, fuel logging
+- **Time-slot filtering** — Start/end pickers grey out windows already reserved on each craft
 - **Waitlist** — Auto-notification when a cancelled slot opens
 - **Weather alerts** — NWS API integration (boat: zone/county alerts; plane: METAR), daily 6 AM cron
 - **Trip reminders** — Daily 6 PM email cron for upcoming reservations
 - **Fuel log & statistics** — Per-trip fuel records, aggregated reporting
+- **Maintenance tracking** — Service records with cost and hours; recurring scheduled tasks with overdue detection (calendar and hours-based)
+- **Fleet status page** — Member-facing view of maintenance schedule and service history
 - **Incident / damage reports** — Structured reports with admin review
 - **Message board** — Posts with photo attachments
+- **Per-club branding** — Custom primary/accent colors, logo, hero banner image
+- **Club photo gallery** — Admin-uploaded gallery visible to all members
+- **Vehicle photos** — Primary vehicle photo shown on the reservation form
 - **Family accounts** — Two logins sharing one reservation slot
 - **iCal feed** — Personal token-based calendar subscription
 - **AI-routed member feedback** — Routes feedback to GitHub issues (bugs) or email (other)
 - **Monthly PDF statements** — Upload and per-member access control
 - **Audit log** — Tracks all admin actions
-- **Admin dashboard** — User management, blackouts, approvals, CSV export, trip logs
+- **Admin dashboard** — User management, blackouts, approvals, CSV export, trip logs, maintenance
 - **Super-admin panel** — Club provisioning, activation/deactivation across all tenants
 
 ---
@@ -144,29 +150,29 @@ CLUB_SHORT_NAME=bentley python app.py
 
 ```
 FleetNests/
-├── app.py              # Flask routes and view logic (1,244 lines)
-├── models.py           # Per-club DB query layer / business logic (1,018 lines)
-├── auth.py             # Session auth, login_required, superadmin_required (170 lines)
-├── db.py               # Per-request DSN-switching PostgreSQL wrapper (105 lines)
-├── club_resolver.py    # before_request hook: subdomain → club record + DSN (132 lines)
-├── master_db.py        # Master DB query layer (clubs registry, super-admins) (166 lines)
-├── master_models.py    # provision_club() workflow (200 lines)
-├── vehicle_types.py    # Boat / plane constants and checkout context builder (184 lines)
-├── email_notify.py     # Email notification helpers (256 lines)
-├── weather.py          # NWS / METAR alert fetching (170 lines)
+├── app.py              # Flask routes and view logic
+├── models.py           # Per-club DB query layer / business logic
+├── auth.py             # Session auth, login_required, superadmin_required
+├── db.py               # Per-request DSN-switching PostgreSQL wrapper
+├── club_resolver.py    # before_request hook: subdomain → club record + DSN
+├── master_db.py        # Master DB query layer (clubs registry, super-admins)
+├── master_models.py    # provision_club() workflow
+├── vehicle_types.py    # Boat / plane constants and checkout context builder
+├── email_notify.py     # Email notification helpers
+├── weather.py          # NWS / METAR alert fetching
 ├── weather_check.py    # Daily weather alert cron script
 ├── trip_reminder.py    # Evening reservation reminder cron script
 ├── feedback.py         # AI-routed member feedback
 ├── init_master_db.sql  # Master DB schema (clubs, super_admins, vehicle_templates)
-├── init_club_db.sql    # Per-club DB schema (replaces legacy init_db.sql)
+├── init_club_db.sql    # Per-club DB schema (all club tables)
 ├── gunicorn.conf.py    # Server config (bind :5210, 2 workers)
 ├── docker-compose.yml  # db-master + db-clubs + web services
 ├── Dockerfile          # Python 3.12-slim image
 ├── requirements.txt    # Python dependencies
 ├── templates/          # Jinja2 templates
-│   ├── superadmin/     # Super-admin panel templates (separate base, no club branding)
+│   ├── superadmin/     # Super-admin panel templates
 │   └── admin/          # Club-admin templates
-└── static/             # CSS, JS, uploaded photos
+└── static/             # CSS, JS, icons
 ```
 
 ---
@@ -193,24 +199,30 @@ FleetNests/
 | `fuel_log` | Per-trip fuel records |
 | `waitlist` | Queue entries with auto-notify on cancellation |
 | `incident_reports` | Damage / incident reports |
+| `maintenance_records` | Completed service work per craft (date, category, hours, cost) |
+| `maintenance_schedules` | Recurring tasks with calendar-month and/or hours-based intervals |
 | `messages` | Message board posts |
 | `message_photos` | Photo attachments |
 | `feedback_submissions` | Member feedback before AI routing |
 | `statements` | Monthly PDF statement uploads with per-member visibility |
 | `audit_log` | Admin action history |
 | `club_settings` | Key/value store for per-club configuration |
-| `ical_tokens` | Personal tokens for iCal feed subscriptions |
+| `club_branding` | Colors, logo, and hero banner image |
+| `club_photos` | Admin-uploaded gallery images |
+| `vehicle_photos` | Per-vehicle photos (one marked as primary) |
 
 ---
 
 ## Key Business Rules
 
-- Reservations: 2–6 hours, 30-minute intervals, up to 60 days ahead
+- Reservations: 2–6 hours, 30-minute intervals, up to 60 days ahead (all configurable)
 - No overlap with existing bookings (`active` or `pending_approval`) or blackout dates
 - Per-member limits: consecutive days and total pending reservations (configurable)
+- Max concurrent vehicles per member at the same time (configurable)
 - Family accounts: two login credentials sharing one reservation slot
-- Overlap check is enforced at the database level (table lock + atomic insert) to prevent race conditions
-- A day is "fully booked" only when no 2-hour gap remains; partial bookings show remaining availability
+- Overlap check enforced at the database level (table lock + atomic insert) to prevent race conditions
+- A day is "fully booked" only when no 2-hour gap remains on any vehicle
+- Maintenance schedules go overdue when `next_due_date <= today` OR `vehicle.current_hours >= next_due_hours`
 
 ---
 

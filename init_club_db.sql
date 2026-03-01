@@ -280,6 +280,46 @@ CREATE TABLE IF NOT EXISTS vehicle_photos (
 );
 
 -- -------------------------------------------------------------------------
+-- Maintenance records (completed service work per vehicle)
+-- -------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS maintenance_records (
+    id                SERIAL PRIMARY KEY,
+    vehicle_id        INTEGER NOT NULL REFERENCES vehicles(id),
+    performed_by      VARCHAR(100),
+    performed_at      DATE NOT NULL,
+    category          VARCHAR(50) NOT NULL DEFAULT 'general',
+    description       TEXT NOT NULL,
+    hours_at_service  NUMERIC(8,1),          -- Hobbs/tach reading at time of service
+    cost              NUMERIC(10,2),
+    notes             TEXT,
+    created_by        INTEGER REFERENCES users(id),
+    created_at        TIMESTAMP DEFAULT NOW()
+);
+
+-- -------------------------------------------------------------------------
+-- Maintenance schedules (recurring tasks with due-date/hours tracking)
+-- -------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS maintenance_schedules (
+    id                   SERIAL PRIMARY KEY,
+    vehicle_id           INTEGER NOT NULL REFERENCES vehicles(id),
+    task_name            VARCHAR(100) NOT NULL,
+    category             VARCHAR(50)  NOT NULL DEFAULT 'general',
+    description          TEXT,
+    interval_months      INTEGER,               -- calendar interval (NULL = hours-only)
+    interval_hours       NUMERIC(8,1),          -- hours interval  (NULL = calendar-only)
+    last_performed_at    DATE,
+    last_performed_hours NUMERIC(8,1),
+    next_due_date        DATE,
+    next_due_hours       NUMERIC(8,1),
+    priority             VARCHAR(10)  NOT NULL DEFAULT 'normal'
+                             CHECK (priority IN ('low', 'normal', 'high')),
+    is_active            BOOLEAN DEFAULT TRUE,
+    created_at           TIMESTAMP DEFAULT NOW()
+);
+
+-- -------------------------------------------------------------------------
 -- Indexes
 -- -------------------------------------------------------------------------
 
@@ -297,6 +337,9 @@ CREATE INDEX IF NOT EXISTS idx_audit_time     ON audit_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_fuel_vehicle   ON fuel_log(vehicle_id);
 CREATE INDEX IF NOT EXISTS idx_incident_vehicle ON incident_reports(vehicle_id);
 CREATE INDEX IF NOT EXISTS idx_waitlist_vehicle ON waitlist(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_maint_rec_vehicle  ON maintenance_records(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_maint_rec_date     ON maintenance_records(performed_at);
+CREATE INDEX IF NOT EXISTS idx_maint_sched_vehicle ON maintenance_schedules(vehicle_id);
 
 -- -------------------------------------------------------------------------
 -- Grant (placeholder — actual user name injected by provisioning script)

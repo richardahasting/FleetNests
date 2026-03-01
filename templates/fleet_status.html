@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Fleet Status — {{ club.name if club else 'FleetNests' }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="fw-bold mb-0">
+    <i class="bi bi-tools me-2 text-club-blue"></i>Fleet Status
+  </h5>
+</div>
+
+{% set overdue_count = schedules | selectattr('id', 'in', overdue_ids) | list | length %}
+{% if overdue_count > 0 %}
+<div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
+  <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+  <div>
+    <strong>{{ overdue_count }} maintenance item{{ 's' if overdue_count != 1 else '' }}</strong>
+    {{ 'are' if overdue_count != 1 else 'is' }} overdue or coming due soon.
+    Please contact the club administrator.
+  </div>
+</div>
+{% endif %}
+
+{% if schedules %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-club-blue text-white">
+    <i class="bi bi-calendar-check me-2"></i>Maintenance Schedule
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Craft</th>
+          <th>Task</th>
+          <th>Next Due Date</th>
+          <th>Next Due Hours</th>
+          <th>Priority</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in schedules %}
+        {% set is_overdue = s.id in overdue_ids %}
+        {% set is_soon = s.next_due_date and s.next_due_date <= warn_date and not is_overdue %}
+        <tr class="{{ 'table-danger' if is_overdue else ('table-warning' if is_soon else '') }}">
+          <td class="fw-semibold small">{{ s.vehicle_name }}</td>
+          <td>
+            <span class="fw-medium">{{ s.task_name }}</span>
+            {% if s.description %}
+            <div class="text-muted small">{{ s.description }}</div>
+            {% endif %}
+            <div><span class="badge bg-secondary text-capitalize small">{{ s.category | replace('_', ' ') }}</span></div>
+          </td>
+          <td class="small">
+            {% if s.next_due_date %}{{ s.next_due_date.strftime('%b %d, %Y') }}{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="small">
+            {% if s.next_due_hours %}{{ "%.1f"|format(s.next_due_hours) }} hrs{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td>
+            {% if s.priority == 'high' %}
+              <span class="badge bg-danger">High</span>
+            {% elif s.priority == 'low' %}
+              <span class="badge bg-light text-dark border">Low</span>
+            {% else %}
+              <span class="badge bg-secondary">Normal</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if is_overdue %}
+              <span class="badge bg-danger"><i class="bi bi-exclamation-circle me-1"></i>Overdue</span>
+            {% elif is_soon %}
+              <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Due Soon</span>
+            {% else %}
+              <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>OK</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-calendar-check fs-1 d-block mb-2 text-success"></i>
+    No scheduled maintenance tasks on record.
+  </div>
+</div>
+{% endif %}
+
+<h6 class="fw-bold mt-4 mb-2"><i class="bi bi-journal-text me-2"></i>Recent Service History</h6>
+<div class="accordion" id="serviceAccordion">
+  {% for vehicle in vehicles %}
+  {% set vrecs = records | selectattr('vehicle_id', 'equalto', vehicle.id) | list %}
+  <div class="accordion-item border-0 shadow-sm mb-2">
+    <h2 class="accordion-header">
+      <button class="accordion-button collapsed fw-semibold" type="button"
+              data-bs-toggle="collapse" data-bs-target="#svc-{{ vehicle.id }}">
+        <i class="bi bi-{{ 'airplane' if is_plane else 'water' }} me-2 text-club-blue"></i>
+        {{ vehicle.name }}
+        {% if vehicle.current_hours %}
+        <small class="text-muted ms-2 fw-normal">{{ vehicle.current_hours }} logged hrs</small>
+        {% endif %}
+        <span class="badge bg-secondary ms-2">{{ vrecs | length }} record{{ 's' if vrecs | length != 1 else '' }}</span>
+      </button>
+    </h2>
+    <div id="svc-{{ vehicle.id }}" class="accordion-collapse collapse">
+      <div class="accordion-body p-0">
+        {% if vrecs %}
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Performed By</th>
+                <th>Hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in vrecs[:20] %}
+              <tr>
+                <td class="small text-nowrap">{{ r.performed_at.strftime('%b %d, %Y') }}</td>
+                <td><span class="badge bg-secondary text-capitalize small">{{ r.category | replace('_', ' ') }}</span></td>
+                <td class="small">{{ r.description }}</td>
+                <td class="small text-muted">{{ r.performed_by or '—' }}</td>
+                <td class="small text-muted">{{ "%.1f"|format(r.hours_at_service) if r.hours_at_service else '—' }}</td>
+              </tr>
+              {% endfor %}
+              {% if vrecs | length > 20 %}
+              <tr><td colspan="5" class="text-muted small text-center py-2">
+                Showing 20 of {{ vrecs | length }} records. See admin panel for full history.
+              </td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-muted small p-3">No service records for this craft yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

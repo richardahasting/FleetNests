@@ -679,6 +679,162 @@ def register_routes(app: Flask):
         flash("Incident marked as resolved.", "success")
         return redirect(url_for("admin_incidents"))
 
+    # -- Maintenance Records & Schedules ----------------------------------
+
+    MAINT_CATEGORIES = [
+        "general", "engine", "hull", "electrical", "safety",
+        "annual_inspection", "avionics", "fuel_system", "cooling",
+        "rigging", "propeller", "airframe", "other",
+    ]
+
+    @app.route("/fleet-status")
+    @auth.login_required
+    def fleet_status():
+        """Member-facing fleet maintenance status overview."""
+        vehicles = models.get_all_vehicles()
+        records = models.get_maintenance_records()
+        schedules = models.get_maintenance_schedules()
+        overdue = models.get_overdue_schedules()
+        overdue_ids = {r["id"] for r in overdue}
+        today = date.today()
+        warn_date = today + timedelta(days=30)
+        return render_template(
+            "fleet_status.html",
+            vehicles=vehicles,
+            records=records,
+            schedules=schedules,
+            overdue_ids=overdue_ids,
+            today=today,
+            warn_date=warn_date,
+        )
+
+    @app.route("/admin/maintenance")
+    @auth.admin_required
+    def admin_maintenance():
+        vehicles = models.get_all_vehicles()
+        records = models.get_maintenance_records()
+        schedules = models.get_maintenance_schedules(active_only=False)
+        overdue = models.get_overdue_schedules()
+        overdue_ids = {r["id"] for r in overdue}
+        today = date.today()
+        warn_date = today + timedelta(days=30)
+        return render_template(
+            "admin/maintenance.html",
+            vehicles=vehicles,
+            records=records,
+            schedules=schedules,
+            overdue_ids=overdue_ids,
+            today=today,
+            warn_date=warn_date,
+            categories=MAINT_CATEGORIES,
+        )
+
+    @app.route("/admin/maintenance/records/new", methods=["POST"])
+    @auth.admin_required
+    def admin_maintenance_record_new():
+        vehicle_id   = request.form.get("vehicle_id", type=int)
+        performed_by = request.form.get("performed_by", "").strip() or None
+        performed_at = request.form.get("performed_at", "").strip()
+        category     = request.form.get("category", "general").strip()
+        description  = request.form.get("description", "").strip()
+        hours_str    = request.form.get("hours_at_service", "").strip()
+        cost_str     = request.form.get("cost", "").strip()
+        notes        = request.form.get("notes", "").strip() or None
+
+        if not vehicle_id or not performed_at or not description:
+            flash("Vehicle, date, and description are required.", "danger")
+            return redirect(url_for("admin_maintenance"))
+        try:
+            done_date = date.fromisoformat(performed_at)
+        except ValueError:
+            flash("Invalid date format.", "danger")
+            return redirect(url_for("admin_maintenance"))
+
+        hours    = float(hours_str) if hours_str else None
+        cost     = float(cost_str)  if cost_str  else None
+        user     = auth.current_user()
+        models.create_maintenance_record(
+            vehicle_id, performed_by, done_date, category, description,
+            hours, cost, notes, user["id"],
+        )
+        models.log_action(user["id"], "maintenance_record_added", "vehicle", vehicle_id,
+                          {"category": category, "performed_at": str(done_date)})
+        flash("Maintenance record saved.", "success")
+        return redirect(url_for("admin_maintenance"))
+
+    @app.route("/admin/maintenance/records/<int:record_id>/delete", methods=["POST"])
+    @auth.admin_required
+    def admin_maintenance_record_delete(record_id: int):
+        models.delete_maintenance_record(record_id)
+        models.log_action(auth.current_user()["id"], "maintenance_record_deleted",
+                          "maintenance_record", record_id)
+        flash("Maintenance record deleted.", "success")
+        return redirect(url_for("admin_maintenance"))
+
+    @app.route("/admin/maintenance/schedules/new", methods=["POST"])
+    @auth.admin_required
+    def admin_maintenance_schedule_new():
+        vehicle_id    = request.form.get("vehicle_id", type=int)
+        task_name     = request.form.get("task_name", "").strip()
+        category      = request.form.get("category", "general").strip()
+        description   = request.form.get("description", "").strip() or None
+        int_months    = request.form.get("interval_months", "").strip()
+        int_hours     = request.form.get("interval_hours", "").strip()
+        next_due_date = request.form.get("next_due_date", "").strip()
+        next_due_hrs  = request.form.get("next_due_hours", "").strip()
+        priority      = request.form.get("priority", "normal").strip()
+
+        if not vehicle_id or not task_name:
+            flash("Vehicle and task name are required.", "danger")
+            return redirect(url_for("admin_maintenance"))
+
+        try:
+            months  = int(int_months)   if int_months  else None
+            hours   = float(int_hours)  if int_hours   else None
+            due_d   = date.fromisoformat(next_due_date) if next_due_date else None
+            due_h   = float(next_due_hrs) if next_due_hrs else None
+        except ValueError:
+            flash("Invalid numeric value.", "danger")
+            return redirect(url_for("admin_maintenance"))
+
+        models.create_maintenance_schedule(
+            vehicle_id, task_name, category, description,
+            months, hours, None, None, due_d, due_h, priority,
+        )
+        user = auth.current_user()
+        models.log_action(user["id"], "maintenance_schedule_added", "vehicle", vehicle_id,
+                          {"task": task_name})
+        flash(f"Scheduled task '{task_name}' added.", "success")
+        return redirect(url_for("admin_maintenance"))
+
+    @app.route("/admin/maintenance/schedules/<int:schedule_id>/done", methods=["POST"])
+    @auth.admin_required
+    def admin_maintenance_schedule_done(schedule_id: int):
+        done_date_str = request.form.get("done_date", date.today().isoformat()).strip()
+        done_hours_str = request.form.get("done_hours", "").strip()
+        try:
+            done_date_val = date.fromisoformat(done_date_str)
+        except ValueError:
+            flash("Invalid date.", "danger")
+            return redirect(url_for("admin_maintenance"))
+        done_hours_val = float(done_hours_str) if done_hours_str else None
+        models.mark_schedule_done(schedule_id, done_date_val, done_hours_val)
+        user = auth.current_user()
+        models.log_action(user["id"], "maintenance_schedule_done",
+                          "maintenance_schedule", schedule_id,
+                          {"done_date": str(done_date_val)})
+        flash("Task marked as completed and next due date updated.", "success")
+        return redirect(url_for("admin_maintenance"))
+
+    @app.route("/admin/maintenance/schedules/<int:schedule_id>/delete", methods=["POST"])
+    @auth.admin_required
+    def admin_maintenance_schedule_delete(schedule_id: int):
+        models.delete_maintenance_schedule(schedule_id)
+        models.log_action(auth.current_user()["id"], "maintenance_schedule_deleted",
+                          "maintenance_schedule", schedule_id)
+        flash("Schedule deleted.", "success")
+        return redirect(url_for("admin_maintenance"))
+
     # -- Fuel Log ---------------------------------------------------------
 
     @app.route("/fuel/new", methods=["GET", "POST"])
