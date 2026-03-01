@@ -11,17 +11,28 @@
 {% if show_form %}
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-header bg-danger text-white fw-semibold">
-    <i class="bi bi-calendar-x me-1"></i>Block the Boat
+    <i class="bi bi-calendar-x me-1"></i>Block Dates
   </div>
   <div class="card-body p-4">
     <form method="post">
       <div class="row g-3">
+
+        {# Date range #}
         <div class="col-md-4">
-          <label class="form-label">Date</label>
-          <input type="date" class="form-control" name="date" required>
+          <label class="form-label">Start Date</label>
+          <input type="date" class="form-control" name="start_date" id="start_date" required>
         </div>
+        <div class="col-md-4">
+          <label class="form-label">
+            End Date
+            <span class="text-white-50 fw-normal small">(optional — leave blank for single day)</span>
+          </label>
+          <input type="date" class="form-control" name="end_date" id="end_date">
+        </div>
+
+        {# All day toggle #}
         <div class="col-12">
-          <div class="form-check mb-2">
+          <div class="form-check mb-0">
             <input class="form-check-input" type="checkbox" name="all_day" id="all_day" checked onchange="toggleTimes()">
             <label class="form-check-label" for="all_day">All day</label>
           </div>
@@ -34,13 +45,36 @@
           <label class="form-label">End Time</label>
           <input type="time" class="form-control" name="end_time" step="1800">
         </div>
+
+        {# Reason #}
         <div class="col-md-8">
           <label class="form-label">Reason</label>
-          <input type="text" class="form-control" name="reason" maxlength="200" placeholder="e.g. Annual maintenance, Club race day" required>
+          <input type="text" class="form-control" name="reason" maxlength="200"
+                 placeholder="e.g. Annual maintenance, Club race day" required>
         </div>
+
+        {# Vehicle selector — only shown when multiple vehicles exist #}
+        {% if vehicles|length > 1 %}
+        <div class="col-12">
+          <label class="form-label fw-semibold">
+            Apply to
+            <span class="text-muted fw-normal small">(leave all unchecked to block all {% if is_plane %}aircraft{% else %}vessels{% endif %})</span>
+          </label>
+          <div class="d-flex flex-wrap gap-3">
+            {% for v in vehicles %}
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="vehicle_id"
+                     id="bv{{ v.id }}" value="{{ v.id }}">
+              <label class="form-check-label" for="bv{{ v.id }}">{{ v.name }}</label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
         <div class="col-12">
           <button type="submit" class="btn btn-danger me-2">
-            <i class="bi bi-calendar-x me-1"></i>Block Date
+            <i class="bi bi-calendar-x me-1"></i>Block Dates
           </button>
           <a href="{{ url_for('admin_blackouts') }}" class="btn btn-outline-secondary">Cancel</a>
         </div>
@@ -54,19 +88,39 @@
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
       <thead class="table-light">
-        <tr><th>Date</th><th>Time</th><th>Reason</th><th></th></tr>
+        <tr>
+          <th>Start</th>
+          <th>End</th>
+          <th>Time</th>
+          {% if vehicles|length > 1 %}<th>Vehicle</th>{% endif %}
+          <th>Reason</th>
+          <th></th>
+        </tr>
       </thead>
       <tbody>
         {% for b in blackouts %}
+        {% set multiday = b.start_time.date() != b.end_time.date() %}
         <tr>
-          <td>{{ b.start_time.strftime('%a, %b %d, %Y') }}</td>
+          <td class="text-nowrap">{{ b.start_time.strftime('%a, %b %d, %Y') }}</td>
+          <td class="text-nowrap text-muted">
+            {% if multiday %}{{ b.end_time.strftime('%a, %b %d, %Y') }}{% else %}—{% endif %}
+          </td>
           <td class="text-muted">
-            {% if b.start_time.strftime('%H:%M') == '00:00' and b.end_time.strftime('%H:%M') == '23:59' %}
+            {% if b.start_time.strftime('%H:%M') == '00:00' and b.end_time.strftime('%H:%M') in ('23:59', '23:59:59') %}
               All day
             {% else %}
-              {{ b.start_time.strftime('%-I:%M %p') }} &ndash; {{ b.end_time.strftime('%-I:%M %p') }} CT
+              {{ b.start_time.strftime('%-I:%M %p') }} &ndash; {{ b.end_time.strftime('%-I:%M %p') }}
             {% endif %}
           </td>
+          {% if vehicles|length > 1 %}
+          <td>
+            {% if b.vehicle_name %}
+              <span class="badge bg-secondary">{{ b.vehicle_name }}</span>
+            {% else %}
+              <span class="text-muted small">All</span>
+            {% endif %}
+          </td>
+          {% endif %}
           <td>{{ b.reason }}</td>
           <td class="text-end">
             <form method="post" action="{{ url_for('admin_delete_blackout', blackout_id=b.id) }}"
@@ -76,7 +130,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="4" class="text-center text-muted py-4">No blackout dates.</td></tr>
+        <tr><td colspan="6" class="text-center text-muted py-4">No blackout dates.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -90,5 +144,10 @@ function toggleTimes() {
   document.getElementById('startTimeField').style.display = allDay ? 'none' : '';
   document.getElementById('endTimeField').style.display = allDay ? 'none' : '';
 }
+document.getElementById('start_date').addEventListener('change', function() {
+  const ed = document.getElementById('end_date');
+  if (ed.value && ed.value < this.value) ed.value = this.value;
+  ed.min = this.value;
+});
 </script>
 {% endblock %}

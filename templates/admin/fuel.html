@@ -47,6 +47,7 @@
         <tr>
           <th>Date</th>
           <th>Member</th>
+          <th>Vehicle</th>
           <th class="text-end">Gallons</th>
           <th class="text-end">$/Gal</th>
           <th class="text-end">Total</th>
@@ -58,6 +59,13 @@
         <tr>
           <td class="text-nowrap small">{{ f.log_date.strftime('%b %d, %Y') }}</td>
           <td>{{ f.full_name }}</td>
+          <td>
+            {% if f.vehicle_name %}
+              <span class="badge bg-secondary">{{ f.vehicle_name }}</span>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
           <td class="text-end">{{ "%.2f" | format(f.gallons | float) }}</td>
           <td class="text-end text-muted small">
             {% if f.price_per_gallon %}${{ "%.3f" | format(f.price_per_gallon | float) }}{% else %}—{% endif %}

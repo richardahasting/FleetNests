@@ -532,10 +532,11 @@ def get_blackout_by_id(blackout_id: int):
     return db.fetchone("SELECT * FROM blackout_dates WHERE id = %s", (blackout_id,))
 
 
-def create_blackout(start_dt, end_dt, reason: str, created_by: int):
+def create_blackout(start_dt, end_dt, reason: str, created_by: int, vehicle_id: int = None):
     return db.insert(
-        "INSERT INTO blackout_dates (start_time, end_time, reason, created_by) VALUES (%s,%s,%s,%s) RETURNING id",
-        (start_dt, end_dt, reason, created_by),
+        "INSERT INTO blackout_dates (start_time, end_time, reason, created_by, vehicle_id) "
+        "VALUES (%s,%s,%s,%s,%s) RETURNING id",
+        (start_dt, end_dt, reason, created_by, vehicle_id or None),
     )
 
 
@@ -544,7 +545,12 @@ def delete_blackout(blackout_id: int):
 
 
 def get_all_blackouts() -> list:
-    return db.execute("SELECT * FROM blackout_dates ORDER BY start_time")
+    return db.execute(
+        "SELECT b.*, v.name AS vehicle_name "
+        "FROM blackout_dates b "
+        "LEFT JOIN vehicles v ON v.id = b.vehicle_id "
+        "ORDER BY b.start_time"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -687,19 +693,21 @@ def resolve_incident(incident_id: int, resolved_by: int):
 # ---------------------------------------------------------------------------
 
 def create_fuel_entry(user_id: int, res_id, log_date, gallons: float,
-                      price_per_gallon=None, total_cost=None, notes: str = None):
+                      price_per_gallon=None, total_cost=None, notes: str = None,
+                      vehicle_id: int = None):
     return db.insert(
-        "INSERT INTO fuel_log (user_id, res_id, log_date, gallons, price_per_gallon, total_cost, notes) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
-        (user_id, res_id or None, log_date, gallons, price_per_gallon, total_cost, notes or None),
+        "INSERT INTO fuel_log (user_id, res_id, vehicle_id, log_date, gallons, price_per_gallon, total_cost, notes) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (user_id, res_id or None, vehicle_id or None, log_date, gallons, price_per_gallon, total_cost, notes or None),
     )
 
 
 def get_fuel_for_user(user_id: int) -> list:
     return db.execute(
-        "SELECT f.*, r.date AS res_date "
+        "SELECT f.*, r.date AS res_date, v.name AS vehicle_name "
         "FROM fuel_log f "
         "LEFT JOIN reservations r ON r.id = f.res_id "
+        "LEFT JOIN vehicles v ON v.id = COALESCE(f.vehicle_id, r.vehicle_id) "
         "WHERE f.user_id = %s "
         "ORDER BY f.log_date DESC",
         (user_id,),
@@ -708,10 +716,12 @@ def get_fuel_for_user(user_id: int) -> list:
 
 def get_all_fuel_entries() -> list:
     return db.execute(
-        "SELECT f.*, u.full_name, u.username, r.date AS res_date "
+        "SELECT f.*, u.full_name, u.username, r.date AS res_date, "
+        "       v.name AS vehicle_name "
         "FROM fuel_log f "
         "JOIN users u ON u.id = f.user_id "
         "LEFT JOIN reservations r ON r.id = f.res_id "
+        "LEFT JOIN vehicles v ON v.id = COALESCE(f.vehicle_id, r.vehicle_id) "
         "ORDER BY f.log_date DESC"
     )
 
@@ -915,10 +925,12 @@ def update_checkin(res_id: int, checkin_time, primary_hours_in,
 def get_all_trip_logs() -> list:
     return db.execute(
         "SELECT t.*, r.date AS res_date, r.start_time, r.end_time, "
-        "       u.full_name, u.username "
+        "       u.full_name, u.username, "
+        "       v.name AS vehicle_name "
         "FROM trip_logs t "
         "JOIN reservations r ON r.id = t.res_id "
         "JOIN users u ON u.id = t.user_id "
+        "LEFT JOIN vehicles v ON v.id = COALESCE(t.vehicle_id, r.vehicle_id) "
         "ORDER BY t.checkout_time DESC"
     )
 

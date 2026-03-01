@@ -515,37 +515,47 @@ def register_routes(app: Flask):
     @auth.admin_required
     def admin_blackouts():
         blackouts = models.get_all_blackouts()
-        return render_template("admin/blackouts.html", blackouts=blackouts)
+        vehicles  = models.get_all_vehicles()
+        return render_template("admin/blackouts.html", blackouts=blackouts, vehicles=vehicles)
 
     @app.route("/admin/blackouts/new", methods=["GET", "POST"])
     @auth.admin_required
     def admin_new_blackout():
+        vehicles = models.get_all_vehicles()
         if request.method == "POST":
-            date_str  = request.form.get("date", "").strip()
-            start_str = request.form.get("start_time", "").strip()
-            end_str   = request.form.get("end_time", "").strip()
-            reason    = request.form.get("reason", "").strip()
-            all_day   = bool(request.form.get("all_day"))
-            if not date_str or not reason:
-                flash("Date and reason are required.", "danger")
+            start_date_str = request.form.get("start_date", "").strip()
+            end_date_str   = request.form.get("end_date", "").strip() or start_date_str
+            start_str      = request.form.get("start_time", "").strip()
+            end_str        = request.form.get("end_time", "").strip()
+            reason         = request.form.get("reason", "").strip()
+            all_day        = bool(request.form.get("all_day"))
+            vehicle_ids    = request.form.getlist("vehicle_id")  # [] means all vehicles
+            if not start_date_str or not reason:
+                flash("Start date and reason are required.", "danger")
             else:
                 try:
                     if all_day:
-                        start_dt = datetime.fromisoformat(f"{date_str}T00:00:00")
-                        end_dt   = datetime.fromisoformat(f"{date_str}T23:59:59")
+                        start_dt = datetime.fromisoformat(f"{start_date_str}T00:00:00")
+                        end_dt   = datetime.fromisoformat(f"{end_date_str}T23:59:59")
                     else:
-                        start_dt = datetime.fromisoformat(f"{date_str}T{start_str}")
-                        end_dt   = datetime.fromisoformat(f"{date_str}T{end_str}")
+                        start_dt = datetime.fromisoformat(f"{start_date_str}T{start_str}")
+                        end_dt   = datetime.fromisoformat(f"{end_date_str}T{end_str}")
                     if end_dt <= start_dt:
-                        flash("End time must be after start time.", "danger")
+                        flash("End must be after start.", "danger")
                     else:
                         user = auth.current_user()
-                        models.create_blackout(start_dt, end_dt, reason, user["id"])
-                        flash("Blackout date added.", "success")
+                        if vehicle_ids:
+                            for vid in vehicle_ids:
+                                models.create_blackout(start_dt, end_dt, reason,
+                                                       user["id"], int(vid))
+                        else:
+                            models.create_blackout(start_dt, end_dt, reason, user["id"])
+                        flash("Blackout added.", "success")
                         return redirect(url_for("admin_blackouts"))
                 except ValueError:
                     flash("Invalid date or time.", "danger")
-        return render_template("admin/blackouts.html", blackouts=models.get_all_blackouts(), show_form=True)
+        return render_template("admin/blackouts.html", blackouts=models.get_all_blackouts(),
+                               vehicles=vehicles, show_form=True)
 
     @app.route("/admin/blackouts/<int:blackout_id>/delete", methods=["POST"])
     @auth.admin_required
@@ -666,6 +676,7 @@ def register_routes(app: Flask):
 
         if request.method == "POST":
             res_id_form     = request.form.get("res_id", type=int)
+            vehicle_id_form = request.form.get("vehicle_id", type=int)
             log_date        = request.form.get("log_date", "").strip()
             gallons_str     = request.form.get("gallons", "").strip()
             price_str       = request.form.get("price_per_gallon", "").strip()
@@ -688,13 +699,17 @@ def register_routes(app: Flask):
                         flash("Gallons must be a positive number.", "danger")
                     else:
                         models.create_fuel_entry(user["id"], res_id_form, ldate, gallons,
-                                                 price, total, notes)
+                                                 price, total, notes, vehicle_id_form)
                         flash(f"Fuel entry logged: {gallons} gal on {ldate.strftime('%B %d, %Y')}.", "success")
                         return redirect(url_for("my_reservations"))
                 except ValueError:
                     flash("Invalid date or number format. Please check your entries.", "danger")
 
-        return render_template("fuel_form.html", res=res,
+        vehicles = models.get_all_vehicles()
+        # Pre-select vehicle from linked reservation
+        preselect_vid = res["vehicle_id"] if res and res.get("vehicle_id") else None
+        return render_template("fuel_form.html", res=res, vehicles=vehicles,
+                               preselect_vehicle_id=preselect_vid,
                                today=date.today().isoformat())
 
     @app.route("/admin/fuel")
@@ -1169,7 +1184,8 @@ def register_routes(app: Flask):
                                vehicle_type=vtype,
                                default_hours_label=vehicle_types.get_hours_label(vtype),
                                vehicle_photos=models.get_vehicle_photos(),
-                               gallery_photos=models.get_club_photos())
+                               gallery_photos=models.get_club_photos(),
+                               branding=models.get_branding())
 
     # -- Password reset / welcome set-password --------------------------------
 
