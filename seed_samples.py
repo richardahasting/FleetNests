@@ -213,7 +213,7 @@ def seed_club(get_conn, members, vehicles, destinations, conditions,
     # ── clear existing data ──────────────────────────────────────────────────
     for tbl in ["fuel_log", "trip_logs", "reservations", "vehicles",
                 "messages", "users", "club_branding", "club_photos", "vehicle_photos",
-                "maintenance_records", "maintenance_schedules"]:
+                "maintenance_records", "maintenance_schedules", "statements"]:
         cur.execute(f"DELETE FROM {tbl}")
     db.commit()
 
@@ -715,6 +715,98 @@ def seed_maintenance(get_conn, vehicle_names_by_index, records_data, schedules_d
     conn.close()
 
 
+def seed_statements(get_conn, club_name: str, months: int = 6):
+    """Insert placeholder monthly PDF statements for the last N months."""
+    from datetime import date
+    from calendar import month_name
+
+    def make_pdf(title: str, body_lines: list[str]) -> bytes:
+        """Construct a minimal but valid single-page PDF in memory."""
+        lines_text = "  ".join(body_lines)
+        # Content stream
+        stream_content = (
+            f"BT /F1 18 Tf 50 720 Td ({title}) Tj "
+            f"0 -30 Td /F1 11 Tf ({lines_text}) Tj ET"
+        ).encode()
+        stream_len = len(stream_content)
+
+        # Build PDF objects sequentially, tracking byte offsets for xref
+        pdf = b"%PDF-1.4\n"
+
+        obj1_offset = len(pdf)
+        pdf += b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+
+        obj2_offset = len(pdf)
+        pdf += b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+
+        obj3_offset = len(pdf)
+        pdf += (
+            b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]"
+            b"/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n"
+        )
+
+        obj4_offset = len(pdf)
+        header = f"4 0 obj<</Length {stream_len}>>\nstream\n".encode()
+        pdf += header + stream_content + b"\nendstream\nendobj\n"
+
+        obj5_offset = len(pdf)
+        pdf += b"5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\n"
+
+        xref_offset = len(pdf)
+        xref = (
+            b"xref\n0 6\n"
+            b"0000000000 65535 f \n"
+            + f"{obj1_offset:010d} 00000 n \n".encode()
+            + f"{obj2_offset:010d} 00000 n \n".encode()
+            + f"{obj3_offset:010d} 00000 n \n".encode()
+            + f"{obj4_offset:010d} 00000 n \n".encode()
+            + f"{obj5_offset:010d} 00000 n \n".encode()
+        )
+        trailer = f"trailer<</Size 6/Root 1 0 R>>\nstartxref\n{xref_offset}\n%%EOF\n".encode()
+        return pdf + xref + trailer
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("DELETE FROM statements")
+    conn.commit()
+
+    today = date.today()
+    # Start from N months ago
+    year, month = today.year, today.month
+    for _ in range(months):
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+
+    inserted = 0
+    for _ in range(months):
+        month += 1
+        if month == 13:
+            month = 1
+            year += 1
+        period = f"{month_name[month]} {year}"
+        display = f"{period} — {club_name} Statement"
+        body = [
+            f"Club: {club_name}",
+            f"Period: {period}",
+            "This is a placeholder statement generated for demo purposes.",
+        ]
+        pdf_bytes = make_pdf(display, body)
+        cur.execute(
+            "INSERT INTO statements (display_name, filename, file_data, file_size) "
+            "VALUES (%s, %s, %s, %s)",
+            (display, f"statement-{year}-{month:02d}.pdf", psycopg2.Binary(pdf_bytes), len(pdf_bytes)),
+        )
+        inserted += 1
+
+    conn.commit()
+    print(f"  {inserted} placeholder statements inserted")
+    cur.close()
+    conn.close()
+
+
 # ── sample1: Summit Ridge Flying Club maintenance data ─────────────────────────
 
 TODAY = date.today()
@@ -941,6 +1033,8 @@ if __name__ == "__main__":
     print("\nSeeding maintenance data for Sample 1 …")
     seed_maintenance(conn1, [v["name"] for v in VEHICLES_S1],
                      MAINT_RECORDS_S1, MAINT_SCHEDULES_S1)
+    print("\nSeeding statements for Sample 1 …")
+    seed_statements(conn1, "Summit Ridge Flying Club")
 
     print("\nSeeding Sample 2 — Clearwater Boat Club …")
     seed_club(
@@ -959,5 +1053,7 @@ if __name__ == "__main__":
     print("\nSeeding maintenance data for Sample 2 …")
     seed_maintenance(conn2, [v["name"] for v in VEHICLES_S2],
                      MAINT_RECORDS_S2, MAINT_SCHEDULES_S2)
+    print("\nSeeding statements for Sample 2 …")
+    seed_statements(conn2, "Clearwater Boat Club")
 
     print("\nDone.")

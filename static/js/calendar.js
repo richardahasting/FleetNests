@@ -7,15 +7,16 @@ function initCalendar(apiUrl, reserveUrlTemplate) {
   if (!calEl) return;
 
   const calendar = new FullCalendar.Calendar(calEl, {
-    initialView: window.innerWidth < 600 ? 'listMonth' : 'dayGridMonth',
+    initialView: window.innerWidth < 600 ? 'timeGridWeek' : 'dayGridMonth',
     headerToolbar: {
       left:   'prev,next today',
       center: 'title',
-      right:  'dayGridMonth,listMonth',
+      right:  'dayGridMonth,timeGridWeek,listMonth',
     },
     buttonText: {
       today:     'Today',
       month:     'Month',
+      week:      'Week',
       listMonth: 'List',
     },
     height: 'auto',

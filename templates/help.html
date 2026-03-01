@@ -21,7 +21,7 @@
           <a class="list-group-item list-group-item-action py-2 ps-4" href="#my-trips">My Trips</a>
           <a class="list-group-item list-group-item-action py-2 ps-4" href="#checkout">Check-Out</a>
           <a class="list-group-item list-group-item-action py-2 ps-4" href="#checkin">Check-In</a>
-          <a class="list-group-item list-group-item-action py-2 ps-4" href="#captains-checklist">Captain's Checklist</a>
+          <a class="list-group-item list-group-item-action py-2 ps-4" href="#captains-checklist">{% if is_plane %}Pre-Flight Checklist{% else %}Captain's Checklist{% endif %}</a>
           <a class="list-group-item list-group-item-action py-2 ps-4" href="#weather-alerts">Weather Alerts</a>
           <a class="list-group-item list-group-item-action py-2 ps-4" href="#waitlist">Waitlist</a>
           <a class="list-group-item list-group-item-action py-2 ps-4" href="#messages">Message Board</a>
@@ -79,7 +79,7 @@
         <i class="bi bi-door-open me-2 text-club-blue"></i>Getting Started
       </div>
       <div class="card-body p-4">
-        <p>Welcome to the <strong>FleetNests</strong> reservation system. This web app lets you book the club boat, log trips, report issues, and stay in touch with other members.</p>
+        <p>Welcome to the <strong>FleetNests</strong> reservation system. This web app lets you book club {% if is_plane %}aircraft{% else %}craft{% endif %}, log trips, report issues, and stay in touch with other members.</p>
 
         <h6 class="fw-semibold mt-3">Logging In</h6>
         <p class="mb-2">Sign in with your <strong>username</strong> or <strong>email address</strong> and your password. If you're a family sub-member, log in with your own email and password (set by the primary account holder).</p>
@@ -93,7 +93,7 @@
         <h6 class="fw-semibold mt-3">Navigation</h6>
         <p class="mb-1">The top navigation bar gives you access to everything:</p>
         <ul class="mb-0">
-          <li><i class="bi bi-calendar3 me-1 text-club-blue"></i><strong>Calendar</strong> — View availability and book the boat</li>
+          <li><i class="bi bi-calendar3 me-1 text-club-blue"></i><strong>Calendar</strong> — View availability and book club {% if is_plane %}aircraft{% else %}craft{% endif %}</li>
           <li><i class="bi bi-bookmark-star me-1 text-club-blue"></i><strong>My Trips</strong> — Manage your reservations and log trips</li>
           <li><i class="bi bi-bar-chart me-1 text-club-blue"></i><strong>Stats</strong> — See usage statistics for all members</li>
           <li><i class="bi bi-chat-square-text me-1 text-club-blue"></i><strong>Messages</strong> — Club announcements and member posts</li>
@@ -109,19 +109,19 @@
         <i class="bi bi-calendar3 me-2 text-club-blue"></i>The Reservation Calendar
       </div>
       <div class="card-body p-4">
-        <p>The calendar shows all reservations for the club boat at a glance. Switch between <strong>month view</strong> and <strong>list view</strong> using the buttons in the calendar header.</p>
+        <p>The calendar shows all reservations for the club {% if is_plane %}aircraft{% else %}craft{% endif %} at a glance. Switch between <strong>month view</strong> and <strong>list view</strong> using the buttons in the calendar header.</p>
 
         <h6 class="fw-semibold mt-3">Reading the Calendar</h6>
         <ul>
           <li><span class="badge bg-club-blue">&#9679;</span> <strong>Navy events</strong> — Your own reservations (or your family account's)</li>
           <li><span class="badge bg-secondary">&#9679;</span> <strong>Gray events</strong> — Reservations by other members</li>
           <li><span class="badge bg-warning text-dark">&#9679;</span> <strong>Yellow events</strong> — Reservations pending admin approval</li>
-          <li><span class="badge bg-danger">&#9679;</span> <strong>Red events</strong> — Blackout dates (boat unavailable)</li>
+          <li><span class="badge bg-danger">&#9679;</span> <strong>Red events</strong> — Blackout dates (craft unavailable)</li>
         </ul>
-        <p>Events show the <strong>member name</strong> (e.g. "The Hasting family") rather than an individual login name.</p>
+        <p>Events show the <strong>member name</strong> (e.g. "The Skipper family") rather than an individual login name.</p>
 
         <h6 class="fw-semibold mt-3">Booking from the Calendar</h6>
-        <p class="mb-0">Click any <strong>future date</strong> to open the booking page for that day. You can see who has already reserved the boat, check the current weather forecast, and make your own reservation.</p>
+        <p class="mb-0">Click any <strong>future date</strong> to open the booking page for that day. You can see who has already reserved the craft, check the current weather forecast, and make your own reservation.</p>
       </div>
     </div>
 
@@ -140,8 +140,8 @@
               <tr><th>Rule</th><th>Details</th></tr>
             </thead>
             <tbody>
-              <tr><td>Minimum duration</td><td>2 hours</td></tr>
-              <tr><td>Maximum duration</td><td>6 hours</td></tr>
+              <tr><td>Minimum duration</td><td>{{ club_settings.get('min_res_hours', '2') | int }} hours</td></tr>
+              <tr><td>Maximum duration</td><td>{% if club_settings.get('max_res_hours') %}{{ club_settings.get('max_res_hours') | int }} hours{% else %}No limit{% endif %}</td></tr>
               <tr><td>Time increments</td><td>30-minute intervals (e.g. 9:00, 9:30, 10:00)</td></tr>
               <tr><td>Booking window</td><td>Up to 60 days in advance</td></tr>
               <tr><td>Consecutive days</td><td>Maximum 3 days in a row (default; may vary per member)</td></tr>
@@ -194,16 +194,16 @@
         <i class="bi bi-box-arrow-right me-2 text-club-blue"></i>Check-Out (Departure)
       </div>
       <div class="card-body p-4">
-        <p>Check-out is available on the <strong>day of your reservation</strong> from My Trips. It records the boat's condition and your completion of the safety checklist before you leave.</p>
+        <p>Check-out is available on the <strong>day of your reservation</strong> from My Trips. It records the craft's condition and your completion of the safety checklist before you leave.</p>
 
-        <h6 class="fw-semibold mt-3">Captain's Checklist</h6>
-        <p>An 8-step safety checklist grouped into categories (Pre-Launch, Starting &amp; Departure, Return &amp; Shutdown) must be completed at departure. Check each item that applies and submit when ready. The number of verified items is saved to your trip log.</p>
+        <h6 class="fw-semibold mt-3">{% if is_plane %}Pre-Flight Checklist{% else %}Captain's Checklist{% endif %}</h6>
+        <p>A safety checklist must be completed at departure. Check each item that applies and submit when ready. The number of verified items is saved to your trip log.</p>
 
         <h6 class="fw-semibold mt-3">Departure Details</h6>
         <ul class="mb-0">
           <li><strong>Departure Time</strong> — Pre-filled with the current time; adjust if needed.</li>
-          <li><strong>Engine Hours (out)</strong> — Read the engine hour meter and record it here. Helps track maintenance intervals.</li>
-          <li><strong>Fuel Level</strong> — Select the current level: Empty, ¼, ½, ¾, or Full.</li>
+          <li><strong>{% if is_plane %}Hobbs Hours (out){% else %}Engine Hours (out){% endif %}</strong> — Read the hour meter and record it here. Helps track maintenance intervals.</li>
+          {% if is_boat %}<li><strong>Fuel Level</strong> — Select the current level: Empty, ¼, ½, ¾, or Full.</li>{% endif %}
           <li><strong>Condition Notes</strong> — Note any pre-existing damage before leaving. This protects you if something was already damaged.</li>
         </ul>
       </div>
@@ -215,19 +215,19 @@
         <i class="bi bi-box-arrow-in-left me-2 text-success"></i>Check-In (Return)
       </div>
       <div class="card-body p-4">
-        <p>After returning the boat to the dock, use <strong>Check In</strong> from My Trips to close out your trip log.</p>
+        <p>After returning the craft, use <strong>Check In</strong> from My Trips to close out your trip log.</p>
 
         <h6 class="fw-semibold mt-3">Return Details</h6>
         <ul>
-          <li><strong>Return Time</strong> — When you returned the boat to the dock.</li>
-          <li><strong>Engine Hours (in)</strong> — Record the meter on return; the system calculates hours used.</li>
+          <li><strong>Return Time</strong> — When you returned the craft.</li>
+          <li><strong>{% if is_plane %}Hobbs Hours (in){% else %}Engine Hours (in){% endif %}</strong> — Record the meter on return; the system calculates hours used.</li>
           <li><strong>Fuel Added</strong> — Enter gallons added and total cost. A fuel log entry is created automatically.</li>
           <li><strong>Condition on Return</strong> — Note any issues discovered during your trip. Submit a separate <a href="{{ url_for('new_incident') }}">incident report</a> for significant damage.</li>
         </ul>
 
         <div class="alert alert-info small mb-0">
           <i class="bi bi-info-circle me-1"></i>
-          Always log fuel at check-in — it helps the club track costs and ensures the next boater knows the fuel level.
+          Always log fuel at check-in — it helps the club track costs and ensures the next member knows the fuel level.
         </div>
       </div>
     </div>
@@ -235,19 +235,19 @@
     {# --- Captain's Checklist --- #}
     <div class="card border-0 shadow-sm mb-4" id="captains-checklist">
       <div class="card-header bg-transparent fw-semibold">
-        <i class="bi bi-clipboard2-check me-2 text-club-blue"></i>Captain's Checklist
+        <i class="bi bi-clipboard2-check me-2 text-club-blue"></i>{% if is_plane %}Pre-Flight Checklist{% else %}Captain's Checklist{% endif %}
       </div>
       <div class="card-body p-4">
-        <p>The <a href="{{ url_for('checklist_page') }}"><strong>Captain's Checklist</strong></a> is an 8-step pre-departure safety guide covering boat startup, safety equipment, and departure procedure.</p>
+        <p>The <a href="{{ url_for('checklist_page') }}"><strong>{% if is_plane %}Pre-Flight Checklist{% else %}Captain's Checklist{% endif %}</strong></a> is a pre-departure safety guide covering {% if is_plane %}aircraft systems, safety equipment, and departure procedure{% else %}engine startup, safety equipment, and departure procedure{% endif %}.</p>
 
         <h6 class="fw-semibold mt-3">Using the Standalone Checklist</h6>
-        <p>Visit <strong>Rules → Captain's Checklist</strong> at any time to review the steps interactively. You can check items off, track your progress with the progress bar, reset it, and print a copy to bring on the water.</p>
+        <p>Visit <strong>Rules → {% if is_plane %}Pre-Flight Checklist{% else %}Captain's Checklist{% endif %}</strong> at any time to review the steps interactively. You can check items off, track your progress with the progress bar, reset it, and print a copy to bring with you.</p>
 
         <h6 class="fw-semibold mt-3">Recorded Checklist at Check-Out</h6>
         <p>The same checklist appears during the <strong>Check-Out</strong> flow on the day of your reservation. Items checked here are <strong>saved to your trip log</strong> so the club has a record of your pre-departure verification.</p>
 
         <h6 class="fw-semibold mt-3">Club Rules</h6>
-        <p class="mb-0">The <a href="{{ url_for('rules_page') }}"><strong>Rules</strong></a> page lists all Boat Club Member Rules alongside the checklist. Review these before your first trip.</p>
+        <p class="mb-0">The <a href="{{ url_for('rules_page') }}"><strong>Rules</strong></a> page lists all club member rules alongside the checklist. Review these before your first trip.</p>
       </div>
     </div>
 
@@ -286,7 +286,7 @@
         <i class="bi bi-hourglass-split me-2 text-club-blue"></i>Waitlist
       </div>
       <div class="card-body p-4">
-        <p>If the boat is already reserved on a date you want, you can join the <strong>waitlist</strong> for that day.</p>
+        <p>If the craft is already reserved on a date you want, you can join the <strong>waitlist</strong> for that day.</p>
 
         <h6 class="fw-semibold mt-3">How It Works</h6>
         <ol>
@@ -332,7 +332,7 @@
         <p>Upload a photo (max 5 MB, any image format). Your photo appears as your avatar on reservations. If you don't upload one, your first initial is shown.</p>
 
         <h6 class="fw-semibold mt-3">Member Name</h6>
-        <p>This is the name shown on the <strong>calendar and reservations</strong> — visible to all members. It defaults to <em>The [Last Name] family</em> (e.g. "The Hasting family"). You can change it to anything you like — your name, a nickname, or your family name.</p>
+        <p>This is the name shown on the <strong>calendar and reservations</strong> — visible to all members. It defaults to <em>The [Last Name] family</em> (e.g. "The Skipper family"). You can change it to anything you like — your name, a nickname, or your family name.</p>
 
         <h6 class="fw-semibold mt-3">Phone Number</h6>
         <p>Add your phone number so other members and admins can reach you.</p>
@@ -358,11 +358,11 @@
           <li>The primary account holder sets a <strong>family email</strong> and <strong>family password</strong> in their Profile.</li>
           <li>The family member logs in using that email and password at the normal login page.</li>
           <li>They have full access to the shared account — they can book, view, and cancel reservations just like the primary member.</li>
-          <li>Reservations appear under the shared <strong>member name</strong> (e.g. "The Hasting family") regardless of who booked them.</li>
+          <li>Reservations appear under the shared <strong>member name</strong> (e.g. "The Skipper family") regardless of who booked them.</li>
         </ul>
 
         <h6 class="fw-semibold mt-3">One Slot, Two Logins</h6>
-        <p>Family accounts share one reservation slot per day. If Sharon books the boat, Richard cannot also book the same day — they are the same account.</p>
+        <p>Family accounts share one reservation slot per day. If Sharon makes a reservation, the primary account cannot also book the same day — they share the same account.</p>
 
         <h6 class="fw-semibold mt-3">Removing the Family Login</h6>
         <p class="mb-0">The primary account holder can click <strong>Remove</strong> in the Family Login section of their profile at any time to revoke the second set of credentials.</p>
@@ -375,7 +375,7 @@
         <i class="bi bi-fuel-pump me-2 text-club-blue"></i>Fuel Log
       </div>
       <div class="card-body p-4">
-        <p>Fuel usage is tracked to help the club manage costs and ensure the boat always has adequate fuel.</p>
+        <p>Fuel usage is tracked to help the club manage costs and ensure the craft always has adequate fuel.</p>
 
         <h6 class="fw-semibold mt-3">Logging Fuel at Check-In</h6>
         <p>The easiest way is during <strong>check-in</strong> — enter gallons added and total cost. A fuel log entry is created automatically.</p>
@@ -391,7 +391,7 @@
         <i class="bi bi-exclamation-triangle me-2 text-warning"></i>Incident Reports
       </div>
       <div class="card-body p-4">
-        <p>If you observe or cause damage to the boat, you must submit an <strong>incident report</strong>. Prompt reporting helps the club respond quickly and keeps the boat safe for everyone.</p>
+        <p>If you observe or cause damage to the craft, you must submit an <strong>incident report</strong>. Prompt reporting helps the club respond quickly and keeps the craft safe for everyone.</p>
 
         <h6 class="fw-semibold mt-3">Severity Levels</h6>
         <div class="table-responsive">
@@ -457,7 +457,7 @@
           <li>Go to <strong>My Trips</strong> and click the <i class="bi bi-calendar-plus"></i> icon in the top-right corner.</li>
           <li>Copy your personal iCal feed URL.</li>
           <li>In your calendar app, choose <strong>Subscribe to calendar</strong> (or "Add calendar by URL") and paste the URL.</li>
-          <li>Your upcoming boat reservations will appear and stay in sync automatically.</li>
+          <li>Your upcoming reservations will appear and stay in sync automatically.</li>
         </ol>
 
         <div class="alert alert-secondary small mb-0">
