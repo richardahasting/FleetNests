@@ -212,7 +212,8 @@ def seed_club(get_conn, members, vehicles, destinations, conditions,
 
     # ── clear existing data ──────────────────────────────────────────────────
     for tbl in ["fuel_log", "trip_logs", "reservations", "vehicles",
-                "messages", "users", "club_branding", "club_photos", "vehicle_photos"]:
+                "messages", "users", "club_branding", "club_photos", "vehicle_photos",
+                "maintenance_records", "maintenance_schedules"]:
         cur.execute(f"DELETE FROM {tbl}")
     db.commit()
 
@@ -646,6 +647,282 @@ def seed_branding(get_conn, club_key):
     conn.close()
 
 
+def seed_maintenance(get_conn, vehicle_names_by_index, records_data, schedules_data):
+    """Insert realistic maintenance records and schedules for demo clubs."""
+    from datetime import date, timedelta
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("DELETE FROM maintenance_records")
+    cur.execute("DELETE FROM maintenance_schedules")
+    conn.commit()
+
+    # Fetch vehicle IDs in order of name matching
+    vid_map = {}
+    for name in vehicle_names_by_index:
+        cur.execute("SELECT id FROM vehicles WHERE name = %s", (name,))
+        row = cur.fetchone()
+        if row:
+            vid_map[name] = row["id"]
+
+    admin_id = None
+    cur.execute("SELECT id FROM users WHERE is_admin = TRUE LIMIT 1")
+    row = cur.fetchone()
+    if row:
+        admin_id = row["id"]
+
+    for name, recs in records_data.items():
+        vid = vid_map.get(name)
+        if not vid:
+            continue
+        for r in recs:
+            cur.execute("""
+                INSERT INTO maintenance_records
+                  (vehicle_id, performed_by, performed_at, category, description,
+                   hours_at_service, cost, notes, created_by)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (vid, r.get("performed_by"), r["performed_at"], r["category"],
+                  r["description"], r.get("hours"), r.get("cost"),
+                  r.get("notes"), admin_id))
+
+    conn.commit()
+    rec_count = sum(len(v) for v in records_data.values())
+    print(f"  {rec_count} maintenance records inserted")
+
+    for name, scheds in schedules_data.items():
+        vid = vid_map.get(name)
+        if not vid:
+            continue
+        for s in scheds:
+            cur.execute("""
+                INSERT INTO maintenance_schedules
+                  (vehicle_id, task_name, category, description, interval_months,
+                   interval_hours, last_performed_at, last_performed_hours,
+                   next_due_date, next_due_hours, priority, is_active)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,true)
+            """, (vid, s["task"], s["category"], s.get("description"),
+                  s.get("interval_months"), s.get("interval_hours"),
+                  s.get("last_done"), s.get("last_hours"),
+                  s.get("next_due_date"), s.get("next_due_hours"),
+                  s.get("priority", "normal")))
+
+    conn.commit()
+    sched_count = sum(len(v) for v in schedules_data.values())
+    print(f"  {sched_count} maintenance schedules inserted")
+
+    cur.close()
+    conn.close()
+
+
+# ── sample1: Summit Ridge Flying Club maintenance data ─────────────────────────
+
+TODAY = date.today()
+
+MAINT_RECORDS_S1 = {
+    "Piper M600": [
+        {"performed_by": "Mountain Aero Services",  "performed_at": TODAY - timedelta(days=11),
+         "category": "annual_inspection", "description": "Annual inspection completed — airworthy",
+         "hours": 1247.3, "cost": 4850.00, "notes": "No discrepancies found. All ADs complied with."},
+        {"performed_by": "Mountain Aero Services",  "performed_at": TODAY - timedelta(days=11),
+         "category": "avionics", "description": "IFR pitot-static / transponder certification",
+         "hours": 1247.3, "cost": 420.00, "notes": "Certified through " + (TODAY + timedelta(days=365*2)).strftime("%b %Y")},
+        {"performed_by": "Mountain Aero Services",  "performed_at": TODAY - timedelta(days=185),
+         "category": "engine", "description": "Engine oil & filter change (100-hr interval)",
+         "hours": 1184.0, "cost": 285.00},
+        {"performed_by": "Mountain Aero Services",  "performed_at": TODAY - timedelta(days=365),
+         "category": "annual_inspection", "description": "Annual inspection — 1 discrepancy: left brake pad replaced",
+         "hours": 1119.5, "cost": 5200.00},
+        {"performed_by": "Mountain Aero Services",  "performed_at": TODAY - timedelta(days=365+90),
+         "category": "engine", "description": "Engine oil & filter change (100-hr interval)",
+         "hours": 1058.0, "cost": 285.00},
+    ],
+    "Cirrus SR22T": [
+        {"performed_by": "Flagstaff Avionics & MX",  "performed_at": TODAY - timedelta(days=45),
+         "category": "annual_inspection", "description": "Annual inspection completed — airworthy. Spark plugs rotated.",
+         "hours": 843.7, "cost": 3975.00},
+        {"performed_by": "Cirrus Authorized Service", "performed_at": TODAY - timedelta(days=45),
+         "category": "safety", "description": "CAPS parachute repack (6-year interval)",
+         "hours": 843.7, "cost": 8200.00, "notes": "Next repack due in 6 years."},
+        {"performed_by": "Flagstaff Avionics & MX",  "performed_at": TODAY - timedelta(days=200),
+         "category": "engine", "description": "Oil & filter change, fuel injectors cleaned",
+         "hours": 795.0, "cost": 320.00},
+        {"performed_by": "Flagstaff Avionics & MX",  "performed_at": TODAY - timedelta(days=365+30),
+         "category": "annual_inspection", "description": "Annual inspection — vacuum system cleaned",
+         "hours": 724.0, "cost": 4100.00},
+    ],
+}
+
+MAINT_SCHEDULES_S1 = {
+    "Piper M600": [
+        {"task": "Annual Inspection",          "category": "annual_inspection",
+         "description": "FAA required annual airworthiness inspection",
+         "interval_months": 12, "last_done": TODAY - timedelta(days=11),
+         "last_hours": 1247.3,
+         "next_due_date": TODAY + timedelta(days=354), "priority": "high"},
+        {"task": "Engine Oil & Filter Change", "category": "engine",
+         "description": "Change oil and filter every 100 hours or 6 months",
+         "interval_months": 6, "interval_hours": 100.0,
+         "last_done": TODAY - timedelta(days=11), "last_hours": 1247.3,
+         "next_due_date": TODAY + timedelta(days=172),
+         "next_due_hours": 1347.3, "priority": "high"},
+        {"task": "Pitot-Static / Transponder Recertification", "category": "avionics",
+         "description": "IFR certification, required every 24 calendar months",
+         "interval_months": 24, "last_done": TODAY - timedelta(days=11),
+         "next_due_date": TODAY + timedelta(days=719), "priority": "normal"},
+        {"task": "ELT Battery / Inspection",   "category": "safety",
+         "description": "Replace ELT battery per FAR 91.207",
+         "interval_months": 12, "last_done": TODAY - timedelta(days=11),
+         "next_due_date": TODAY + timedelta(days=354), "priority": "normal"},
+        {"task": "Engine TBO Check (2,000 hr)", "category": "engine",
+         "description": "Continental TSIO-550 TBO is 2,000 hours. Track to mid-time overhaul.",
+         "interval_hours": 2000.0, "last_hours": 0.0,
+         "next_due_hours": 2000.0, "priority": "normal"},
+    ],
+    "Cirrus SR22T": [
+        {"task": "Annual Inspection",          "category": "annual_inspection",
+         "description": "FAA required annual airworthiness inspection",
+         "interval_months": 12, "last_done": TODAY - timedelta(days=45),
+         "last_hours": 843.7,
+         "next_due_date": TODAY + timedelta(days=320), "priority": "high"},
+        {"task": "Engine Oil & Filter Change", "category": "engine",
+         "description": "Change oil and filter every 50 hours (turbo engine)",
+         "interval_hours": 50.0,
+         "last_done": TODAY - timedelta(days=45), "last_hours": 843.7,
+         "next_due_hours": 893.7, "priority": "high"},
+        {"task": "CAPS Parachute Repack",      "category": "safety",
+         "description": "Cirrus Airframe Parachute System, 6-year repack cycle",
+         "interval_months": 72, "last_done": TODAY - timedelta(days=45),
+         "next_due_date": TODAY + timedelta(days=365*6 - 45), "priority": "high"},
+        {"task": "Spark Plug Rotation",        "category": "engine",
+         "description": "Rotate top/bottom spark plugs every 100 hours",
+         "interval_hours": 100.0, "last_hours": 843.7,
+         "next_due_hours": 943.7, "priority": "normal"},
+        {"task": "ELT Battery / Inspection",   "category": "safety",
+         "description": "Replace ELT battery per FAR 91.207",
+         "interval_months": 12, "last_done": TODAY - timedelta(days=45),
+         "next_due_date": TODAY + timedelta(days=320), "priority": "normal"},
+    ],
+}
+
+# ── sample2: Clearwater Boat Club maintenance data ─────────────────────────────
+
+MAINT_RECORDS_S2 = {
+    "Catalina 275 Sport": [
+        {"performed_by": "Geneva Lake Marine",     "performed_at": TODAY - timedelta(days=30),
+         "category": "annual_inspection",
+         "description": "Spring commissioning & annual rigging inspection — all standing rigging good, running rigging replaced",
+         "hours": 412.0, "cost": 1850.00},
+        {"performed_by": "Geneva Lake Marine",     "performed_at": TODAY - timedelta(days=30),
+         "category": "engine",
+         "description": "Yanmar 14hp saildrive annual service — impeller, oil, zincs",
+         "hours": 412.0, "cost": 620.00, "notes": "Impeller replaced. Saildrive oil changed. All zincs replaced."},
+        {"performed_by": "Geneva Lake Marine",     "performed_at": TODAY - timedelta(days=30),
+         "category": "hull",
+         "description": "Hull haul-out: bottom paint (ablative), thru-hull inspection, keel bolts checked",
+         "hours": 412.0, "cost": 2400.00},
+        {"performed_by": "Geneva Lake Marine",     "performed_at": TODAY - timedelta(days=365),
+         "category": "annual_inspection",
+         "description": "Spring commissioning — mast stepped, rigging tensioned, all safety gear inventoried",
+         "hours": 318.0, "cost": 1650.00},
+        {"performed_by": "Self",                   "performed_at": TODAY - timedelta(days=200),
+         "category": "safety",
+         "description": "Safety gear audit: flares replaced (expired), throwable updated, VHF battery tested",
+         "hours": 355.0, "cost": 180.00},
+    ],
+    "Bennington 24 SSBXP": [
+        {"performed_by": "Lake Geneva Power Sports", "performed_at": TODAY - timedelta(days=25),
+         "category": "engine",
+         "description": "Outboard 100-hour service — oil, filter, spark plugs, gear lube, zincs",
+         "hours": 87.5, "cost": 545.00},
+        {"performed_by": "Lake Geneva Power Sports", "performed_at": TODAY - timedelta(days=25),
+         "category": "hull",
+         "description": "Pontoon tube inspection — no corrosion, all welds tight, all seals good",
+         "hours": 87.5, "cost": 150.00},
+        {"performed_by": "Self",                     "performed_at": TODAY - timedelta(days=90),
+         "category": "general",
+         "description": "Vinyl upholstery cleaned and UV protectant applied",
+         "hours": 65.0, "cost": 85.00},
+    ],
+    "MasterCraft X22": [
+        {"performed_by": "Authorized MasterCraft Dealer", "performed_at": TODAY - timedelta(days=15),
+         "category": "engine",
+         "description": "20-hour break-in oil change — Ilmor 6.2L GDI (440 HP). All systems nominal.",
+         "hours": 23.2, "cost": 380.00, "notes": "Break-in period complete. Normal operating procedures apply."},
+        {"performed_by": "Self",                          "performed_at": TODAY - timedelta(days=15),
+         "category": "general",
+         "description": "Ballast bladder inspection — all 3 SurfStar bladders filled and drained, no leaks",
+         "hours": 23.2},
+    ],
+}
+
+MAINT_SCHEDULES_S2 = {
+    "Catalina 275 Sport": [
+        {"task": "Annual Commissioning & Rigging Inspection", "category": "annual_inspection",
+         "description": "Spring haul-out, bottom paint, rig inspection, safety gear audit",
+         "interval_months": 12, "last_done": TODAY - timedelta(days=30),
+         "last_hours": 412.0,
+         "next_due_date": TODAY + timedelta(days=335), "priority": "high"},
+        {"task": "Yanmar Engine Annual Service",   "category": "engine",
+         "description": "Impeller, oil, zincs, coolant check — Yanmar 14hp saildrive",
+         "interval_months": 12, "interval_hours": 200.0,
+         "last_done": TODAY - timedelta(days=30), "last_hours": 412.0,
+         "next_due_date": TODAY + timedelta(days=335),
+         "next_due_hours": 612.0, "priority": "high"},
+        {"task": "Standing Rigging Replacement",   "category": "rigging",
+         "description": "Replace all standing rigging (shrouds, forestay) every 10 years or when worn",
+         "interval_months": 120, "last_done": TODAY - timedelta(days=365*3),
+         "next_due_date": TODAY + timedelta(days=365*7), "priority": "low"},
+        {"task": "Safety Flare Replacement",       "category": "safety",
+         "description": "Visual distress signals expire every 42 months (USCG requirement)",
+         "interval_months": 42, "last_done": TODAY - timedelta(days=200),
+         "next_due_date": TODAY + timedelta(days=1050), "priority": "normal"},
+    ],
+    "Bennington 24 SSBXP": [
+        {"task": "Outboard 100-Hour Service",      "category": "engine",
+         "description": "Oil, filter, spark plugs, gear lube, zincs — per engine manual",
+         "interval_hours": 100.0,
+         "last_done": TODAY - timedelta(days=25), "last_hours": 87.5,
+         "next_due_hours": 187.5, "priority": "high"},
+        {"task": "Pontoon Tube Annual Inspection", "category": "hull",
+         "description": "Inspect pontoon tubes, welds, and seals for corrosion or damage",
+         "interval_months": 12, "last_done": TODAY - timedelta(days=25),
+         "next_due_date": TODAY + timedelta(days=340), "priority": "normal"},
+        {"task": "Vinyl & Upholstery UV Treatment","category": "general",
+         "description": "Clean and apply UV protectant to all vinyl surfaces",
+         "interval_months": 6, "last_done": TODAY - timedelta(days=90),
+         "next_due_date": TODAY + timedelta(days=92), "priority": "low"},
+        {"task": "Outboard Annual Winterization",  "category": "engine",
+         "description": "Fog cylinders, flush cooling system, stabilize fuel for winter storage",
+         "interval_months": 12,
+         "next_due_date": date(TODAY.year, 10, 15) if TODAY.month < 10 else date(TODAY.year + 1, 10, 15),
+         "priority": "normal"},
+    ],
+    "MasterCraft X22": [
+        {"task": "Engine 50-Hour Service",         "category": "engine",
+         "description": "Ilmor 6.2L — oil & filter, impeller check, belt tension",
+         "interval_hours": 50.0,
+         "last_done": TODAY - timedelta(days=15), "last_hours": 23.2,
+         "next_due_hours": 73.2, "priority": "high"},
+        {"task": "Annual Ballast System Inspection","category": "general",
+         "description": "Inspect all 3 SurfStar ballast bladders, fittings, and pump",
+         "interval_months": 12, "last_done": TODAY - timedelta(days=15),
+         "next_due_date": TODAY + timedelta(days=350), "priority": "normal"},
+        {"task": "Annual Engine Service",          "category": "engine",
+         "description": "Full annual service: oil, spark plugs, impeller, zincs, coolant flush",
+         "interval_months": 12, "interval_hours": 100.0,
+         "last_done": TODAY - timedelta(days=15), "last_hours": 23.2,
+         "next_due_date": TODAY + timedelta(days=350),
+         "next_due_hours": 123.2, "priority": "high"},
+        {"task": "Winterization",                  "category": "general",
+         "description": "Engine winterization, ballast blow-out, fuel stabilization, shrink wrap",
+         "interval_months": 12,
+         "next_due_date": date(TODAY.year, 11, 1) if TODAY.month < 11 else date(TODAY.year + 1, 11, 1),
+         "priority": "normal"},
+    ],
+}
+
+
 if __name__ == "__main__":
     print("Seeding Sample 1 — Summit Ridge Flying Club …")
     seed_club(
@@ -661,6 +938,9 @@ if __name__ == "__main__":
     seed_photos(conn1, "sample1")
     print("\nSeeding branding for Sample 1 …")
     seed_branding(conn1, "sample1")
+    print("\nSeeding maintenance data for Sample 1 …")
+    seed_maintenance(conn1, [v["name"] for v in VEHICLES_S1],
+                     MAINT_RECORDS_S1, MAINT_SCHEDULES_S1)
 
     print("\nSeeding Sample 2 — Clearwater Boat Club …")
     seed_club(
@@ -676,5 +956,8 @@ if __name__ == "__main__":
     seed_photos(conn2, "sample2")
     print("\nSeeding branding for Sample 2 …")
     seed_branding(conn2, "sample2")
+    print("\nSeeding maintenance data for Sample 2 …")
+    seed_maintenance(conn2, [v["name"] for v in VEHICLES_S2],
+                     MAINT_RECORDS_S2, MAINT_SCHEDULES_S2)
 
     print("\nDone.")
