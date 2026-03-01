@@ -173,6 +173,21 @@
         </div>
         <div class="card-body p-4">
 
+          {# ZIP lookup widget #}
+          <div class="mb-4 p-3 rounded-2" style="background:var(--bs-light,#f8f9fa);border:1px solid #dee2e6">
+            <div class="fw-semibold small mb-2">
+              <i class="bi bi-geo-alt me-1 text-club-blue"></i>Find codes by ZIP code
+            </div>
+            <div class="d-flex gap-2">
+              <input type="text" id="wx_zip" class="form-control form-control-sm"
+                     placeholder="Enter ZIP code" maxlength="5" style="max-width:130px">
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="lookupWeatherCodes()">
+                <i class="bi bi-search me-1"></i>Look up
+              </button>
+            </div>
+            <div id="wx_lookup_status" class="form-text mt-1"></div>
+          </div>
+
           {% if vehicle_type == 'boat' %}
           <div class="mb-3">
             <label class="form-label" for="weather_zone">NWS Weather Zone</label>
@@ -181,8 +196,7 @@
                    placeholder="e.g. TXZ206">
             <div class="form-text">
               Used for marine &amp; severe weather alerts.
-              <a href="https://alerts.weather.gov/search-by-area" target="_blank" rel="noopener">Find your zone code &rarr;</a>
-              (look for the "Zone" column, e.g. <code>TXZ206</code>)
+              <a href="https://alerts.weather.gov/search-by-area" target="_blank" rel="noopener">Find manually &rarr;</a>
             </div>
           </div>
           <div class="mb-0">
@@ -190,25 +204,87 @@
             <input type="text" class="form-control" name="nws_county" id="nws_county"
                    value="{{ settings.get('nws_county', 'TXC091') }}"
                    placeholder="e.g. TXC091">
-            <div class="form-text">
-              Used for flood &amp; flash-flood watch alerts.
-              <a href="https://alerts.weather.gov/search-by-area" target="_blank" rel="noopener">Find your county code &rarr;</a>
-              (look for the "County" column, e.g. <code>TXC091</code>)
-            </div>
+            <div class="form-text">Used for flood &amp; flash-flood watch alerts.</div>
           </div>
           {% else %}
           <div class="mb-0">
-            <label class="form-label" for="aviation_station">Aviation Weather Station (ICAO)</label>
+            <label class="form-label" for="aviation_station">Nearest Airport / Weather Station (ICAO)</label>
             <input type="text" class="form-control" name="aviation_station" id="aviation_station"
                    value="{{ settings.get('aviation_station', 'KSAT') }}"
                    placeholder="e.g. KSAT">
             <div class="form-text">
-              The nearest airport's 4-letter ICAO code — used to pull live METAR data and IFR/LIFR alerts.
-              <a href="https://www.aviationweather.gov/metar" target="_blank" rel="noopener">Find your station &rarr;</a>
-              (search by city or airport name, e.g. <code>KSAT</code> for San Antonio)
+              4-letter ICAO code for the nearest airport — used for live METAR data and IFR/LIFR alerts.
+              <a href="https://www.aviationweather.gov/metar" target="_blank" rel="noopener">Find manually &rarr;</a>
             </div>
           </div>
           {% endif %}
+
+          <script>
+          function wxSetStatus(text, cls) {
+            const el = document.getElementById('wx_lookup_status');
+            el.textContent = text;
+            el.className = 'form-text mt-1 ' + cls;
+          }
+
+          function wxSetStatusParts(parts, cls) {
+            const el = document.getElementById('wx_lookup_status');
+            el.textContent = '';
+            el.className = 'form-text mt-1 ' + cls;
+            parts.forEach(function(p) { el.appendChild(p); });
+          }
+
+          function t(s) { return document.createTextNode(s); }
+          function b(s) { const n = document.createElement('strong'); n.textContent = s; return n; }
+
+          async function lookupWeatherCodes() {
+            const zip = document.getElementById('wx_zip').value.trim();
+            if (!/^\d{5}$/.test(zip)) {
+              wxSetStatus('Please enter a 5-digit ZIP code.', 'text-danger');
+              return;
+            }
+            wxSetStatus('Looking up\u2026', 'text-muted');
+            try {
+              const geoResp = await fetch('https://api.zippopotam.us/us/' + zip);
+              if (!geoResp.ok) { throw new Error('ZIP code not found.'); }
+              const geo  = await geoResp.json();
+              const lat  = parseFloat(geo.places[0].latitude);
+              const lon  = parseFloat(geo.places[0].longitude);
+              const city = geo.places[0]['place name'] + ', ' + geo.places[0]['state abbreviation'];
+
+              const nwsResp = await fetch(
+                'https://api.weather.gov/points/' + lat.toFixed(4) + ',' + lon.toFixed(4),
+                { headers: { 'User-Agent': 'FleetNests/1.0 (hello@fleetnests.com)' } }
+              );
+              if (!nwsResp.ok) { throw new Error('NWS lookup failed \u2014 try a nearby ZIP.'); }
+              const props = (await nwsResp.json()).properties;
+
+              const zone    = (props.forecastZone || '').split('/').pop();
+              const county  = (props.county       || '').split('/').pop();
+              const station = props.gridId ? 'K' + props.gridId : '';
+
+              {% if vehicle_type == 'boat' %}
+              if (zone)   document.getElementById('weather_zone').value = zone;
+              if (county) document.getElementById('nws_county').value   = county;
+              wxSetStatusParts([
+                t('\u2713 Found for ' + city + ': zone '), b(zone),
+                t(', county '), b(county), t('. Review and save.')
+              ], 'text-success');
+              {% else %}
+              if (station) document.getElementById('aviation_station').value = station;
+              wxSetStatusParts([
+                t('\u2713 Nearest NWS office for ' + city + ': '), b(station),
+                t('. Verify this is the closest airport to your airfield.')
+              ], 'text-success');
+              {% endif %}
+            } catch (e) {
+              wxSetStatus('Error: ' + e.message, 'text-danger');
+            }
+          }
+
+          document.getElementById('wx_zip').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); lookupWeatherCodes(); }
+          });
+          </script>
 
         </div>
       </div>
