@@ -14,7 +14,7 @@ Sample 2 — Clearwater Boat Club (Lake Geneva, WI)
   • 14 members
 """
 
-import os, random, sys, json
+import os, random, sys, json, time, urllib.request
 from datetime import date, datetime, timedelta
 import psycopg2
 import psycopg2.extras
@@ -473,6 +473,179 @@ def seed_settings(get_conn, rules, checklist, phone_key, phone_val, extra_settin
 
 # ── main ─────────────────────────────────────────────────────────────────────
 
+VEHICLE_PHOTOS = {
+    "sample1": [
+        {
+            "url": "https://upload.wikimedia.org/wikipedia/commons/3/3c/Piper_M600_at_AERO_Friedrichshafen_2018_%281X7A4373%29.jpg",
+            "caption": "Piper M600 — N623MX",
+            "gallery_title": "Piper M600 (N623MX)",
+            "is_primary": True,
+        },
+        {
+            "url": "https://upload.wikimedia.org/wikipedia/commons/0/06/Cirrus_SR22T_N671MV_FDK_MD1.jpg",
+            "caption": "Cirrus SR22T — N421CR",
+            "gallery_title": "Cirrus SR22T (N421CR)",
+            "is_primary": False,
+        },
+        {
+            "url": "https://upload.wikimedia.org/wikipedia/commons/6/60/Piper_PA-46_M600_cabin_%28EBACE_2023%29.jpg",
+            "caption": "Piper M600 cabin interior",
+            "gallery_title": "Piper M600 — Cabin Interior",
+            "is_primary": False,
+        },
+    ],
+    "sample2": [
+        {
+            "url": "https://upload.wikimedia.org/wikipedia/commons/c/c7/MasterCraft_X22%2C_Interboot_2023%2C_Friedrichshafen_%28P1120649%29.jpg",
+            "caption": "MasterCraft X22",
+            "gallery_title": "MasterCraft X22",
+            "is_primary": True,
+        },
+        {
+            "url": "https://upload.wikimedia.org/wikipedia/commons/8/83/Catalina_275_Sport_sailboat_Wasa_0515.jpg",
+            "caption": "Catalina 275 Sport",
+            "gallery_title": "Catalina 275 Sport",
+            "is_primary": False,
+        },
+        {
+            "url": "https://upload.wikimedia.org/wikipedia/commons/b/b7/Luxury_Pontoon_Boats.jpg",
+            "caption": "Bennington 24 SSBXP pontoon",
+            "gallery_title": "Bennington 24 SSBXP",
+            "is_primary": False,
+        },
+        {
+            "url": "https://upload.wikimedia.org/wikipedia/commons/0/0f/Catalina_275_Sport_sailboat_Wasa_0512.jpg",
+            "caption": "Catalina 275 Sport — stern view",
+            "gallery_title": "Catalina 275 Sport — Stern View",
+            "is_primary": False,
+        },
+    ],
+}
+
+LOGO_PATHS = {
+    "sample1": os.path.expanduser("~/SummitRidgeFlyingClubLogo.jpeg"),
+    "sample2": os.path.expanduser("~/BentleyBoatClubLogo.jpeg"),
+}
+
+HERO_PATHS = {
+    "sample1": None,  # no hero for aviation club
+    "sample2": os.path.expanduser("~/clearwaterboatclub.jpeg"),
+}
+
+# Local image files to add to the gallery (in addition to downloaded Wikimedia images)
+LOCAL_GALLERY = {
+    "sample2": [
+        (os.path.expanduser("~/boatingwithdanandsteve.jpeg"), "A Day on the Lake"),
+        (os.path.expanduser("~/sevenDeep.jpeg"),              "Anchored Out"),
+    ],
+}
+
+
+def _download(url, retries=3):
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 FleetNests/1.0"})
+    for attempt in range(retries):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return r.read()
+        except Exception as e:
+            if attempt < retries - 1:
+                wait = (attempt + 1) * 15
+                print(f"    Retry {attempt+1} after {wait}s ({e})")
+                time.sleep(wait)
+            else:
+                raise
+
+
+def seed_photos(get_conn, club_key):
+    """Download vehicle and gallery photos from Wikimedia and insert into DB."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM vehicle_photos")
+    cur.execute("DELETE FROM club_photos")
+    print(f"  Cleared photos for {club_key}")
+
+    for img in VEHICLE_PHOTOS.get(club_key, []):
+        print(f"  Downloading: {img['caption']}")
+        try:
+            data = _download(img["url"])
+        except Exception as e:
+            print(f"  SKIP (download failed): {e}")
+            continue
+
+        if img["is_primary"]:
+            cur.execute("UPDATE vehicle_photos SET is_primary = FALSE")
+        cur.execute(
+            "INSERT INTO vehicle_photos (caption, photo_data, content_type, is_primary) "
+            "VALUES (%s, %s, %s, %s)",
+            (img["caption"], psycopg2.Binary(data), "image/jpeg", img["is_primary"]),
+        )
+        cur.execute(
+            "INSERT INTO club_photos (title, photo_data, content_type) VALUES (%s, %s, %s)",
+            (img["gallery_title"], psycopg2.Binary(data), "image/jpeg"),
+        )
+        print(f"  Inserted: {img['caption']}")
+        time.sleep(5)
+
+    # Add local gallery images
+    for path, title in LOCAL_GALLERY.get(club_key, []):
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                data = f.read()
+            cur.execute(
+                "INSERT INTO club_photos (title, photo_data, content_type) VALUES (%s, %s, %s)",
+                (title, psycopg2.Binary(data), "image/jpeg"),
+            )
+            print(f"  Inserted local gallery: {title}")
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def seed_branding(get_conn, club_key):
+    """Load logo/hero from local files and upsert into club_branding."""
+    logo_path = LOGO_PATHS.get(club_key)
+    hero_path = HERO_PATHS.get(club_key)
+
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM club_branding LIMIT 1")
+    row = cur.fetchone()
+    if not row:
+        cur.execute("INSERT INTO club_branding DEFAULT VALUES")
+        conn.commit()
+
+    if logo_path and os.path.exists(logo_path):
+        ext = os.path.splitext(logo_path)[1].lower()
+        ct = "image/png" if ext == ".png" else "image/jpeg"
+        with open(logo_path, "rb") as f:
+            data = f.read()
+        cur.execute(
+            "UPDATE club_branding SET logo_data = %s, logo_content_type = %s",
+            (psycopg2.Binary(data), ct),
+        )
+        print(f"  Loaded logo: {logo_path} ({len(data):,} bytes)")
+    else:
+        print(f"  No logo file at {logo_path}, skipping")
+
+    if hero_path and os.path.exists(hero_path):
+        ext = os.path.splitext(hero_path)[1].lower()
+        ct = "image/jpeg" if ext in (".jpg", ".jpeg") else "image/png"
+        with open(hero_path, "rb") as f:
+            data = f.read()
+        cur.execute(
+            "UPDATE club_branding SET hero_data = %s, hero_content_type = %s",
+            (psycopg2.Binary(data), ct),
+        )
+        print(f"  Loaded hero: {hero_path} ({len(data):,} bytes)")
+    else:
+        print(f"  No hero file at {hero_path}, skipping")
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
 if __name__ == "__main__":
     print("Seeding Sample 1 — Summit Ridge Flying Club …")
     seed_club(
@@ -484,6 +657,10 @@ if __name__ == "__main__":
     seed_settings(conn1, RULES_S1, CHECKLIST_S1,
                   phone_key="fbo_phone", phone_val="928-213-2900",
                   extra_settings={"aviation_station": "KFLG"})
+    print("\nSeeding photos for Sample 1 …")
+    seed_photos(conn1, "sample1")
+    print("\nSeeding branding for Sample 1 …")
+    seed_branding(conn1, "sample1")
 
     print("\nSeeding Sample 2 — Clearwater Boat Club …")
     seed_club(
@@ -495,5 +672,9 @@ if __name__ == "__main__":
     seed_settings(conn2, RULES_S2, CHECKLIST_S2,
                   phone_key="marina_phone", phone_val="262-248-6200",
                   extra_settings={"weather_zone": "WIZ064", "nws_county": "WIC127"})
+    print("\nSeeding photos for Sample 2 …")
+    seed_photos(conn2, "sample2")
+    print("\nSeeding branding for Sample 2 …")
+    seed_branding(conn2, "sample2")
 
     print("\nDone.")
