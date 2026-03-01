@@ -110,6 +110,54 @@
         </div>
       </div>
 
+      {# ---- Reservation Rules ---- #}
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent fw-semibold">
+          <i class="bi bi-calendar-check me-2 text-club-blue"></i>Reservation Rules
+        </div>
+        <div class="card-body p-4">
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="form-label" for="min_res_hours">Minimum Duration (hours)</label>
+              <input type="number" class="form-control" name="min_res_hours" id="min_res_hours"
+                     min="0" step="0.5"
+                     value="{{ settings.get('min_res_hours', '') }}"
+                     placeholder="e.g. 2">
+              <div class="form-text">Leave blank for no minimum.</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="max_res_hours">Maximum Duration (hours)</label>
+              <input type="number" class="form-control" name="max_res_hours" id="max_res_hours"
+                     min="0" step="0.5"
+                     value="{{ settings.get('max_res_hours', '') }}"
+                     placeholder="e.g. 72">
+              <div class="form-text">Leave blank for no maximum. Supports multi-day (e.g. 72 = 3 days).</div>
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label" for="max_advance_days">Book Up To (days in advance)</label>
+              <input type="number" class="form-control" name="max_advance_days" id="max_advance_days"
+                     min="1" step="1"
+                     value="{{ settings.get('max_advance_days', '60') }}"
+                     placeholder="60">
+              <div class="form-text">How far ahead members can book.</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="max_future_reservations">Max Future Reservations per Member</label>
+              <input type="number" class="form-control" name="max_future_reservations" id="max_future_reservations"
+                     min="0" step="1"
+                     value="{{ settings.get('max_future_reservations', '') }}"
+                     placeholder="e.g. 3">
+              <div class="form-text">Leave blank or 0 for unlimited.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
       {# ---- Weather ---- #}
       <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-transparent fw-semibold">

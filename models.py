@@ -257,21 +257,46 @@ def _has_consecutive_violation(dates: set, max_run: int = 3) -> bool:
 
 
 def validate_reservation(user_id: int, start_dt: datetime, end_dt: datetime,
-                          vehicle_id: int = None, vehicle_noun: str = "vehicle") -> str | None:
+                          vehicle_id: int = None, vehicle_noun: str = "vehicle",
+                          settings: dict = None) -> str | None:
     """
     Check all business rules for a new reservation.
     Returns an error string on failure, or None if valid.
 
     Rules enforced:
-      1. Minimum 2 hours, maximum 6 hours duration
+      1. Minimum/maximum duration (configurable via club_settings; defaults 2h / no max)
       2. Start must be in the future
-      3. Start and end must be on the same calendar day
+      3. No booking more than max_advance_days ahead (configurable; default 60)
       4. No overlap with any existing active reservation for this vehicle
       5. No overlap with a blackout date for this vehicle (or club-wide)
-      6. User must have fewer pending reservations than their per-member limit
+      6. User must have fewer future reservations than club max_future_reservations (0 = unlimited)
       7. Adding this date must not create a run exceeding the per-member consecutive-day limit
     """
+    if settings is None:
+        settings = get_all_club_settings()
+
     hours = (end_dt - start_dt).total_seconds() / 3600
+
+    # Duration limits — read from settings, fall back to safe defaults
+    try:
+        min_hours = float(settings.get("min_res_hours") or 0)
+    except (ValueError, TypeError):
+        min_hours = 0
+    try:
+        max_hours_val = settings.get("max_res_hours") or ""
+        max_hours = float(max_hours_val) if str(max_hours_val).strip() else None
+    except (ValueError, TypeError):
+        max_hours = None
+
+    try:
+        advance_days = int(settings.get("max_advance_days") or 60)
+    except (ValueError, TypeError):
+        advance_days = 60
+
+    try:
+        max_future = int(settings.get("max_future_reservations") or 0)
+    except (ValueError, TypeError):
+        max_future = 0
 
     if end_dt <= start_dt:
         return "End time must be after start time."
@@ -282,20 +307,19 @@ def validate_reservation(user_id: int, start_dt: datetime, end_dt: datetime,
     if end_dt.minute % 30 != 0 or end_dt.second != 0:
         return "End time must be on a 30-minute interval (e.g. 9:00, 9:30, 10:00)."
 
-    if hours < 2:
-        return f"Minimum reservation length is 2 hours (you selected {hours:.1f}h)."
+    if min_hours > 0 and hours < min_hours:
+        label = f"{min_hours:.0f}h" if min_hours == int(min_hours) else f"{min_hours:.1f}h"
+        return f"Minimum reservation length is {label} (you selected {hours:.1f}h)."
 
-    if hours > 6:
-        return f"Maximum reservation length is 6 hours (you selected {hours:.1f}h)."
+    if max_hours is not None and hours > max_hours:
+        label = f"{max_hours:.0f}h" if max_hours == int(max_hours) else f"{max_hours:.1f}h"
+        return f"Maximum reservation length is {label} (you selected {hours:.1f}h)."
 
     if start_dt < now_ct():
         return "Start time cannot be in the past."
 
-    if start_dt.date() > date.today() + timedelta(days=60):
-        return "Reservations cannot be made more than 60 days in advance."
-
-    if start_dt.date() != end_dt.date():
-        return "Reservations must start and end on the same calendar day."
+    if advance_days > 0 and start_dt.date() > date.today() + timedelta(days=advance_days):
+        return f"Reservations cannot be made more than {advance_days} days in advance."
 
     # Overlap check: scoped to this vehicle if vehicle_id provided
     if vehicle_id:
@@ -334,9 +358,10 @@ def validate_reservation(user_id: int, start_dt: datetime, end_dt: datetime,
 
     limits = get_user_limits(user_id)
 
-    # Pending limit
-    if get_pending_count(user_id) >= limits["max_pending"]:
-        return f"You already have {limits['max_pending']} upcoming reservations — the maximum allowed."
+    # Per-member pending limit: use club setting if set, else per-user setting
+    effective_max_pending = max_future if max_future > 0 else limits["max_pending"]
+    if get_pending_count(user_id) >= effective_max_pending:
+        return f"You already have {effective_max_pending} upcoming reservations — the maximum allowed."
 
     # Consecutive day check (date-level; same day with two slots still counts as 1 day)
     future_rows = get_user_future_reservations(user_id)

@@ -243,15 +243,17 @@ def register_routes(app: Flask):
                 on_waitlist=models.is_on_waitlist(eff_id, day),
                 day_is_fully_booked=fully_booked,
                 vehicle_photo=models.get_primary_vehicle_photo(),
+                res_settings=settings,
             )
             if extra:
                 kw.update(extra)
             return render_template("reserve.html", **kw)
 
         if request.method == "POST":
-            start_str   = request.form.get("start_time", "").strip()
-            end_str     = request.form.get("end_time",   "").strip()
-            notes       = request.form.get("notes", "").strip()[:300]
+            start_str    = request.form.get("start_time", "").strip()
+            end_str      = request.form.get("end_time",   "").strip()
+            end_date_str = request.form.get("end_date", "").strip() or res_date
+            notes        = request.form.get("notes", "").strip()[:300]
             selected_ids = request.form.getlist("vehicle_id")
 
             # Validate inputs
@@ -271,7 +273,7 @@ def register_routes(app: Flask):
 
             try:
                 start_dt = datetime.fromisoformat(f"{res_date}T{start_str}")
-                end_dt   = datetime.fromisoformat(f"{res_date}T{end_str}")
+                end_dt   = datetime.fromisoformat(f"{end_date_str}T{end_str}")
             except ValueError:
                 flash("Invalid time format.", "danger")
                 return _render()
@@ -281,7 +283,8 @@ def register_routes(app: Flask):
             errors = []
             for vid in vehicle_ids:
                 err = models.validate_reservation(eff_id, start_dt, end_dt,
-                                                  vehicle_id=vid, vehicle_noun=vnoun)
+                                                  vehicle_id=vid, vehicle_noun=vnoun,
+                                                  settings=settings)
                 if err:
                     vname = next((v["name"] for v in vehicles if v["id"] == vid), f"Vehicle {vid}")
                     errors.append(f"{vname}: {err}")
@@ -1172,7 +1175,9 @@ def register_routes(app: Flask):
                 models.update_club_setting(key, "true" if request.form.get(key) else "false")
             # Text fields — save as-is (empty string clears the override)
             for key in ["hours_label", "marina_phone", "fbo_phone",
-                        "weather_zone", "nws_county", "aviation_station"]:
+                        "weather_zone", "nws_county", "aviation_station",
+                        "min_res_hours", "max_res_hours",
+                        "max_advance_days", "max_future_reservations"]:
                 val = request.form.get(key, "").strip()
                 models.update_club_setting(key, val)
             user = auth.current_user()
