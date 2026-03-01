@@ -257,13 +257,13 @@
         <i class="bi bi-cloud-lightning-rain me-2 text-club-blue"></i>Weather Alerts &amp; Pre-Trip Reminders
       </div>
       <div class="card-body p-4">
-        <p>The system automatically monitors weather conditions and sends proactive notifications to keep you safe on the water.</p>
+        <p>The system automatically monitors weather conditions and sends proactive notifications to keep you safe {% if is_plane %}in the air{% else %}on the water{% endif %}.</p>
 
         <h6 class="fw-semibold mt-3">Evening Reminder (6 PM the night before)</h6>
         <p>If you have a reservation tomorrow, you'll receive an email reminder at 6 PM the evening before with your reservation details and a link to the Captain's Checklist.</p>
 
         <h6 class="fw-semibold mt-3">Weather Alerts (6 AM daily)</h6>
-        <p>Each morning the system checks the <strong>National Weather Service</strong> for active hazardous alerts in the Canyon Lake / Comal County area. If a hazardous alert is active, all members with reservations in the next 48 hours are notified by email. Alert types that trigger notifications include:</p>
+        <p>Each morning the system checks the <strong>National Weather Service</strong> for active hazardous alerts in the {{ club.name if club else 'club' }} area. If a hazardous alert is active, all members with reservations in the next 48 hours are notified by email. Alert types that trigger notifications include:</p>
         <ul class="mb-2">
           <li>Tornado Warning / Watch</li>
           <li>Severe Thunderstorm Warning / Watch</li>
@@ -407,8 +407,8 @@
               </tr>
               <tr>
                 <td><span class="badge bg-warning text-dark">Moderate</span></td>
-                <td>Affects boat operation</td>
-                <td>Broken bilge pump, engine warning light</td>
+                <td>Affects {% if is_plane %}aircraft{% else %}vessel{% endif %} operation</td>
+                <td>{% if is_plane %}Avionics warning, landing gear issue{% else %}Broken bilge pump, engine warning light{% endif %}</td>
               </tr>
               <tr>
                 <td><span class="badge bg-danger">Major</span></td>

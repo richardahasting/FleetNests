@@ -299,9 +299,11 @@ def validate_reservation(user_id: int, start_dt: datetime, end_dt: datetime,
         max_future = 0
 
     try:
-        max_concurrent = int(settings.get("max_concurrent_vehicles") or 0)
+        _mc_raw = settings.get("max_concurrent_vehicles")
+        # Default to 1 when not configured; explicit "0" means unlimited
+        max_concurrent = int(_mc_raw) if _mc_raw not in (None, "") else 1
     except (ValueError, TypeError):
-        max_concurrent = 0
+        max_concurrent = 1
 
     if end_dt <= start_dt:
         return "End time must be after start time."

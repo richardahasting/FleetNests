@@ -158,8 +158,8 @@
               <input type="number" class="form-control" name="max_concurrent_vehicles" id="max_concurrent_vehicles"
                      min="0" step="1"
                      value="{{ settings.get('max_concurrent_vehicles', '') }}"
-                     placeholder="e.g. 1">
-              <div class="form-text">Leave blank or 0 for unlimited. Set to 1 to prevent overlapping reservations.</div>
+                     placeholder="1">
+              <div class="form-text">Default: 1. Set to 0 for unlimited. Set to 1 to prevent a member from having overlapping reservations.</div>
             </div>
           </div>
 
@@ -273,7 +273,7 @@
               if (station) document.getElementById('aviation_station').value = station;
               wxSetStatusParts([
                 t('\u2713 Nearest NWS office for ' + city + ': '), b(station),
-                t('. Verify this is the closest airport to your airfield.')
+                t('. Verify this is the closest airport to your location.')
               ], 'text-success');
               {% endif %}
             } catch (e) {
