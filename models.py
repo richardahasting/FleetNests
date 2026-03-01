@@ -798,7 +798,7 @@ def add_to_waitlist(user_id: int, desired_date, notes: str = None):
     try:
         return db.insert(
             "INSERT INTO waitlist (user_id, desired_date, notes) VALUES (%s, %s, %s) "
-            "ON CONFLICT (user_id, desired_date) DO NOTHING RETURNING id",
+            "RETURNING id",
             (user_id, desired_date, notes or None),
         )
     except Exception:
