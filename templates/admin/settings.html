@@ -153,6 +153,14 @@
                      placeholder="e.g. 3">
               <div class="form-text">Leave blank or 0 for unlimited.</div>
             </div>
+            <div class="col-md-4">
+              <label class="form-label" for="max_concurrent_vehicles">Max Vehicles per Member at Same Time</label>
+              <input type="number" class="form-control" name="max_concurrent_vehicles" id="max_concurrent_vehicles"
+                     min="0" step="1"
+                     value="{{ settings.get('max_concurrent_vehicles', '') }}"
+                     placeholder="e.g. 1">
+              <div class="form-text">Leave blank or 0 for unlimited. Set to 1 to prevent overlapping reservations.</div>
+            </div>
           </div>
 
         </div>

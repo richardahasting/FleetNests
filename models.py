@@ -298,6 +298,11 @@ def validate_reservation(user_id: int, start_dt: datetime, end_dt: datetime,
     except (ValueError, TypeError):
         max_future = 0
 
+    try:
+        max_concurrent = int(settings.get("max_concurrent_vehicles") or 0)
+    except (ValueError, TypeError):
+        max_concurrent = 0
+
     if end_dt <= start_dt:
         return "End time must be after start time."
 
@@ -369,6 +374,23 @@ def validate_reservation(user_id: int, start_dt: datetime, end_dt: datetime,
     existing_dates.add(start_dt.date())
     if _has_consecutive_violation(existing_dates, max_run=limits["max_consecutive"]):
         return f"This reservation would exceed your {limits['max_consecutive']}-consecutive-day limit."
+
+    # Concurrent vehicle limit: count how many vehicles this member already has reserved
+    # overlapping [start_dt, end_dt). 0 = unlimited.
+    if max_concurrent > 0:
+        concurrent_row = db.fetchone(
+            "SELECT COUNT(DISTINCT vehicle_id) AS cnt FROM reservations "
+            "WHERE user_id = %s AND status IN ('active','pending_approval') "
+            "AND start_time < %s AND end_time > %s",
+            (user_id, end_dt, start_dt),
+        )
+        concurrent_count = int(concurrent_row["cnt"]) if concurrent_row else 0
+        if concurrent_count >= max_concurrent:
+            noun = "vehicle" if max_concurrent == 1 else f"{max_concurrent} vehicles"
+            return (
+                f"You already have a reservation during that time. "
+                f"The club allows at most {noun} per member simultaneously."
+            )
 
     return None
 

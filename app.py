@@ -1191,7 +1191,8 @@ def register_routes(app: Flask):
             for key in ["hours_label", "marina_phone", "fbo_phone",
                         "weather_zone", "nws_county", "aviation_station",
                         "min_res_hours", "max_res_hours",
-                        "max_advance_days", "max_future_reservations"]:
+                        "max_advance_days", "max_future_reservations",
+                        "max_concurrent_vehicles"]:
                 val = request.form.get(key, "").strip()
                 models.update_club_setting(key, val)
             user = auth.current_user()
