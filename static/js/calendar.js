@@ -31,8 +31,10 @@ function initCalendar(apiUrl, reserveUrlTemplate) {
     },
 
     // Tap an empty day → go to reserve page for that date
+    // info.dateStr can be "2026-03-19" (month view) or "2026-03-19T10:00:00" (week/time view)
     dateClick: function(info) {
-      window.location.href = reserveUrlTemplate.replace('DATE', info.dateStr);
+      const dateOnly = info.dateStr.substring(0, 10);
+      window.location.href = reserveUrlTemplate.replace('DATE', dateOnly);
     },
 
     // Events already have url set; FullCalendar follows them on click
